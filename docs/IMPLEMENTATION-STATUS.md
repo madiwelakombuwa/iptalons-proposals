@@ -1,6 +1,6 @@
 # Managed-workspace implementation status — 2026-09-08
 
-The selected first release is a managed IPTalons workspace, owned on GitHub by `vindiw` under the private repository name `iptalons-proposals`.
+The selected first release is a managed IPTalons workspace, owned on GitHub by `madiwelakombuwa` under the private repository name `iptalons-proposals`.
 
 ## Implemented locally
 
@@ -21,7 +21,7 @@ The selected first release is a managed IPTalons workspace, owned on GitHub by `
 
 ## Required before the managed paid release
 
-1. Establish repository access and publish privately under vindiw. Enable branch protection and verify CI on GitHub.
+1. Publish privately under madiwelakombuwa (owner confirmed by the user). Enable branch protection and verify CI on GitHub.
 2. Confirm the intended Cloudflare account, domain, and existing production resources. Export live KV and browser records; test restoration. Provision separate staging resources without touching existing records.
 3. Replace the shared password with individual identity, allowlisted membership and revocable sessions. Define administrator and member permissions.
 4. Implement authoritative D1 workspace/prospect/proposal/version storage, an idempotent browser-data importer with review and conflict handling, and tested backups. Preserve original IDs and dates during migration.
