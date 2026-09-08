@@ -1,0 +1,31 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "iptalons-proposals",
+  "account_id": "aa96f50b9174b128d2cbe8f6db54b940",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-05-06",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "SHARES",
+      "id": "938f657a4f2e4f649fa844cb3ff10db8"
+    }
+  ],
+  "triggers": {
+    // Daily summary email — 02:00 UTC ≈ 7:30 AM Colombo. No-ops until
+    // RESEND_API_KEY + DIGEST_TO secrets are set.
+    "crons": ["0 2 * * *"]
+  },
+  "vars": { "AI_ENABLED": "false" },
+  "ratelimits": [
+    { "name": "AI_RATE_LIMIT", "namespace_id": "2026090801", "simple": { "limit": 10, "period": 60 } },
+    { "name": "LOGIN_RATE_LIMIT", "namespace_id": "2026090802", "simple": { "limit": 5, "period": 60 } }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

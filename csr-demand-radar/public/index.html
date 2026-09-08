@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IPTalons CSR · Demand Signals Radar</title>
+<meta name="description" content="Live demand-signal intelligence: researchers and institutions feeling foreign-influence (FIG) risk pain right now — mined from Reddit and X.">
+<style>
+  :root{
+    --bg:#070b14; --bg2:#0b1220; --panel:#0e1626; --panel2:#111d31;
+    --line:#1c2a41; --line2:#26374f;
+    --ink:#e8eefb; --mut:#8fa2c1; --dim:#647998;
+    --cyan:#37e0c8; --cyan-d:#149e8c;
+    --amber:#ffb340; --amber-d:#c47e17;
+    --red:#ff5d6c; --violet:#8b7dff; --green:#54d68a;
+    --shadow:0 18px 50px -20px rgba(0,0,0,.8);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(55,224,200,.08), transparent 60%),
+      radial-gradient(900px 500px at 0% 10%, rgba(139,125,255,.08), transparent 55%),
+      var(--bg);
+    color:var(--ink);
+    font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;line-height:1.5;overflow-x:hidden;
+  }
+  .mono{font-family:"SFMono-Regular",ui-monospace,Menlo,Consolas,monospace}
+  a{color:var(--cyan);text-decoration:none}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+
+  /* top bar */
+  .top{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
+    background:rgba(7,11,20,.72);border-bottom:1px solid var(--line)}
+  .top .wrap{display:flex;align-items:center;gap:16px;height:60px}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:700;letter-spacing:.2px}
+  .brand .logo{width:26px;height:26px}
+  .brand small{color:var(--mut);font-weight:500}
+  .top .spacer{flex:1}
+  .livewrap{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mut);
+    border:1px solid var(--line2);padding:6px 11px;border-radius:999px}
+  .pulse{width:8px;height:8px;border-radius:50%;background:var(--green);
+    box-shadow:0 0 0 0 rgba(84,214,138,.6);animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(84,214,138,.55)}70%{box-shadow:0 0 0 9px rgba(84,214,138,0)}100%{box-shadow:0 0 0 0 rgba(84,214,138,0)}}
+  .cta{background:linear-gradient(135deg,var(--cyan),var(--cyan-d));color:#04231f;
+    font-weight:700;font-size:13px;padding:9px 15px;border-radius:9px;white-space:nowrap}
+
+  /* hero */
+  .hero{position:relative;padding:64px 0 34px}
+  .hero-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:40px;align-items:center}
+  .kicker{display:inline-flex;align-items:center;gap:8px;font-size:12px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--cyan);border:1px solid var(--cyan-d);
+    padding:5px 11px;border-radius:999px;background:rgba(55,224,200,.06)}
+  h1{font-size:clamp(31px,4.6vw,52px);line-height:1.05;margin:18px 0 14px;letter-spacing:-.02em;font-weight:800}
+  h1 .g{background:linear-gradient(120deg,var(--cyan),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .lede{font-size:17px;color:var(--mut);max-width:560px}
+  .lede b{color:var(--ink);font-weight:600}
+  .herobtns{display:flex;gap:12px;margin-top:26px;flex-wrap:wrap}
+  .btn{padding:12px 18px;border-radius:11px;font-weight:650;font-size:14px;cursor:pointer;border:1px solid var(--line2);background:var(--panel);color:var(--ink);transition:.15s}
+  .btn:hover{border-color:var(--cyan-d);transform:translateY(-1px)}
+  .btn.primary{background:linear-gradient(135deg,var(--cyan),var(--cyan-d));color:#04231f;border:none}
+
+  /* radar */
+  .radar-card{position:relative;aspect-ratio:1/1;border:1px solid var(--line);border-radius:20px;
+    background:radial-gradient(circle at 50% 50%, rgba(55,224,200,.05), var(--panel) 70%);
+    box-shadow:var(--shadow);overflow:hidden}
+  .radar svg{width:100%;height:100%;display:block}
+  .ring{fill:none;stroke:var(--line2);stroke-width:1}
+  .cross{stroke:var(--line2);stroke-width:1}
+  .sweep{transform-origin:250px 250px;animation:spin 4.6s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .blip{opacity:0;animation:blip 4.6s linear infinite}
+  @keyframes blip{0%,52%{opacity:0}56%{opacity:1}100%{opacity:0}}
+  .blip.hot{fill:var(--red)} .blip.warm{fill:var(--amber)} .blip.inst{fill:var(--cyan)} .blip.acad{fill:var(--violet)}
+  .radar-tag{position:absolute;left:16px;bottom:14px;font-size:11px;color:var(--dim);letter-spacing:.12em;text-transform:uppercase}
+  .radar-legend{position:absolute;right:14px;top:14px;display:flex;flex-direction:column;gap:6px;font-size:11px;color:var(--mut)}
+  .radar-legend span{display:flex;align-items:center;gap:6px}
+  .dot{width:8px;height:8px;border-radius:50%}
+  .d-hot{background:var(--red)} .d-warm{background:var(--amber)} .d-inst{background:var(--cyan)} .d-acad{background:var(--violet)}
+
+  /* stat strip */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:34px 0 8px}
+  .stat{border:1px solid var(--line);background:linear-gradient(180deg,var(--panel),var(--bg2));
+    border-radius:14px;padding:18px 18px 15px}
+  .stat .n{font-size:34px;font-weight:800;letter-spacing:-.02em}
+  .stat .n .u{font-size:16px;color:var(--mut);font-weight:600}
+  .stat .l{font-size:12.5px;color:var(--mut);margin-top:3px}
+  .stat.c1 .n{color:var(--cyan)} .stat.c2 .n{color:var(--amber)} .stat.c3 .n{color:var(--violet)} .stat.c4 .n{color:var(--green)}
+
+  section{padding:44px 0;scroll-margin-top:72px}
+  .sec-h{display:flex;align-items:baseline;gap:14px;margin-bottom:6px}
+  .sec-h h2{font-size:25px;font-weight:750;margin:0;letter-spacing:-.01em}
+  .sec-h .idx{font-size:12px;color:var(--dim)}
+  .sec-sub{color:var(--mut);font-size:15px;margin:0 0 22px;max-width:720px}
+
+  /* filters */
+  .filters{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:22px}
+  .chip{font-size:13px;padding:8px 14px;border-radius:999px;border:1px solid var(--line2);
+    background:var(--panel);color:var(--mut);cursor:pointer;transition:.15s;display:flex;align-items:center;gap:7px;font-weight:600}
+  .chip:hover{color:var(--ink)}
+  .chip.on{color:var(--ink);border-color:var(--cyan-d);background:rgba(55,224,200,.08)}
+  .chip .c{width:8px;height:8px;border-radius:50%}
+  .chip .ct{font-size:11px;color:var(--dim);font-weight:700}
+
+  /* lead grid */
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  .lead{border:1px solid var(--line);background:var(--panel);border-radius:15px;padding:18px 19px;
+    position:relative;transition:.16s;overflow:hidden}
+  .lead:hover{border-color:var(--line2);transform:translateY(-2px);box-shadow:var(--shadow)}
+  .lead::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px}
+  .lead.hot::before{background:var(--red)} .lead.warm::before{background:var(--amber)}
+  .lead.inst::before{background:var(--cyan)} .lead.acad::before{background:var(--violet)} .lead.comp::before{background:var(--dim)}
+  .lead-top{display:flex;align-items:center;gap:9px;margin-bottom:10px;flex-wrap:wrap}
+  .tier{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:6px}
+  .tier.hot{background:rgba(255,93,108,.14);color:var(--red)}
+  .tier.warm{background:rgba(255,179,64,.14);color:var(--amber)}
+  .tier.inst{background:rgba(55,224,200,.13);color:var(--cyan)}
+  .tier.acad{background:rgba(139,125,255,.15);color:var(--violet)}
+  .tier.comp{background:rgba(100,121,152,.16);color:var(--mut)}
+  .src{font-size:11.5px;color:var(--dim);margin-left:auto}
+  .handle{font-weight:700;font-size:15px}
+  .pain{font-size:13.5px;color:var(--mut);margin:4px 0 12px}
+  .quote{border-left:2px solid var(--line2);padding:2px 0 2px 12px;margin:0 0 12px;
+    font-size:13.5px;color:#c3d2ea;font-style:italic}
+  .angle{background:rgba(55,224,200,.05);border:1px solid rgba(55,224,200,.16);border-radius:9px;
+    padding:9px 11px;font-size:12.5px;color:#bfe9e0}
+  .angle b{color:var(--cyan);font-style:normal}
+  .lead a.open{display:inline-flex;align-items:center;gap:5px;margin-top:11px;font-size:12.5px;font-weight:650}
+  .hidden{display:none!important}
+
+  /* two-col info sections */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .card{border:1px solid var(--line);background:var(--panel);border-radius:15px;padding:20px 21px}
+  .card h3{margin:0 0 4px;font-size:16px}
+  .card .cap{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.12em;margin-bottom:14px}
+  .row{display:flex;gap:11px;padding:11px 0;border-top:1px solid var(--line)}
+  .row:first-of-type{border-top:none}
+  .row .ic{width:30px;height:30px;flex:0 0 30px;border-radius:8px;display:grid;place-items:center;font-size:14px;background:var(--panel2);border:1px solid var(--line2)}
+  .row .tx{flex:1}
+  .row .tx b{font-size:14px}
+  .row .tx p{margin:2px 0 0;font-size:12.5px;color:var(--mut)}
+  .badge{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:5px;background:var(--panel2);color:var(--mut);border:1px solid var(--line2);height:fit-content}
+
+  /* insight banner */
+  .insight{border:1px solid var(--amber-d);background:linear-gradient(120deg,rgba(255,179,64,.08),rgba(255,179,64,.02));
+    border-radius:15px;padding:22px 24px;display:flex;gap:16px;align-items:flex-start}
+  .insight .ib{font-size:24px}
+  .insight h3{margin:0 0 5px;font-size:17px;color:var(--amber)}
+  .insight p{margin:0;color:var(--mut);font-size:14.5px}
+  .insight b{color:var(--ink)}
+
+  /* method */
+  .method{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .step{border:1px solid var(--line);border-radius:13px;padding:16px;background:var(--bg2)}
+  .step .num{font-size:12px;color:var(--cyan);font-weight:800;letter-spacing:.1em}
+  .step b{display:block;margin:7px 0 4px;font-size:14px}
+  .step p{margin:0;font-size:12.5px;color:var(--mut)}
+
+  /* ===== workflow layer (team) ===== */
+  .stpill{font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;padding:3px 8px;border-radius:6px;border:1px solid var(--line2);background:var(--panel2)}
+  .wfbar{display:flex;gap:8px;align-items:center;margin-top:13px;padding-top:12px;border-top:1px dashed var(--line2);flex-wrap:wrap}
+  .wfbar select,.wfbar input,.wfnotes{background:var(--panel2);border:1px solid var(--line2);color:var(--ink);border-radius:8px;padding:6px 9px;font-size:12.5px;font-family:inherit}
+  .wfbar select:focus,.wfbar input:focus,.wfnotes:focus,.tin:focus{outline:none;border-color:var(--cyan-d)}
+  .wfbar input.wf-owner{width:76px}
+  .btn-mini{font-size:12px;font-weight:650;padding:6px 11px;border-radius:8px;border:1px solid var(--line2);background:var(--panel2);color:var(--mut);cursor:pointer;transition:.15s}
+  .btn-mini:hover{color:var(--ink);border-color:var(--cyan-d)}
+  .wf-upd{font-size:11px;color:var(--dim);margin-left:auto}
+  .wfnotes{width:100%;min-height:56px;margin-top:9px;resize:vertical}
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+  .board{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+  .bcol{border:1px solid var(--line);border-radius:12px;background:var(--bg2);padding:10px;min-height:110px}
+  .bcol h4{margin:0 0 9px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);display:flex;justify-content:space-between;gap:6px}
+  .bcard{border:1px solid var(--line2);background:var(--panel);border-radius:9px;padding:7px 9px;font-size:12px;margin-bottom:7px;cursor:pointer;transition:.15s}
+  .bcard:hover{border-color:var(--cyan-d);transform:translateY(-1px)}
+  .bcard .bh{font-weight:700;font-size:12px}
+  .bcard .bs{font-size:10.5px;color:var(--dim)}
+  .act-row{display:flex;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:12.5px;color:var(--mut);align-items:baseline}
+  .act-row:first-child{border-top:none}
+  .act-row .at{color:var(--dim);font-size:11px;white-space:nowrap}
+  .act-row b{color:var(--ink);font-weight:650}
+  .lead.flash{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(55,224,200,.35)}
+  .modal-bg{position:fixed;inset:0;background:rgba(4,7,14,.72);backdrop-filter:blur(5px);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
+  .modal-bg.open{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--line2);border-radius:16px;max-width:640px;width:100%;padding:22px 24px;box-shadow:var(--shadow);max-height:85vh;overflow:auto}
+  .modal h3{margin:0 0 8px;font-size:17px}
+  .tin{width:100%;background:var(--panel2);border:1px solid var(--line2);color:var(--ink);border-radius:9px;padding:10px 12px;font-size:14px;font-family:inherit}
+  .tabs{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}
+  .tab{font-size:12px;font-weight:650;padding:6px 12px;border-radius:999px;border:1px solid var(--line2);background:var(--panel2);color:var(--mut);cursor:pointer}
+  .tab.on{color:var(--ink);border-color:var(--cyan-d);background:rgba(55,224,200,.08)}
+  .cm-text{width:100%;min-height:220px;background:var(--bg2);border:1px solid var(--line2);color:#c9d7ef;border-radius:10px;padding:13px;font-size:13px;line-height:1.55;font-family:inherit;resize:vertical}
+
+  footer{border-top:1px solid var(--line);padding:34px 0 60px;margin-top:30px;color:var(--dim);font-size:13px}
+  footer .wrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .discreet{font-size:11.5px;color:var(--dim);margin-top:6px}
+
+  @media(max-width:900px){
+    .hero-grid{grid-template-columns:1fr;gap:30px}
+    .radar-card{max-width:420px;margin:0 auto;width:100%}
+    .stats{grid-template-columns:repeat(2,1fr)}
+    .grid,.cols,.method{grid-template-columns:1fr}
+    .method{grid-template-columns:1fr 1fr}
+    .board{grid-template-columns:repeat(3,1fr)}
+    .metrics{grid-template-columns:repeat(2,1fr)}
+  }
+  @media(max-width:560px){.method{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="wrap">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 24 24" fill="none"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3z" stroke="#37e0c8" stroke-width="1.6" fill="rgba(55,224,200,.08)"/><path d="M8.5 12l2.4 2.4L16 9.3" stroke="#37e0c8" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      IPTalons&nbsp;<span style="color:var(--cyan)">CSR</span> <small>· Demand Radar</small>
+    </div>
+    <div class="spacer"></div>
+    <div class="livewrap"><span class="pulse"></span> <span class="mono">SIGNALS&nbsp;LIVE</span></div>
+    <button class="btn" id="teamBtn" style="padding:8px 14px;font-size:13px">Team login</button>
+    <a class="cta" id="ctaLeads" href="#leads">View leads →</a>
+  </div>
+</div>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="kicker">◈ Demand-signal intelligence</span>
+      <h1>The market is already <span class="g">asking for CSR</span>.<br>Here's who — by name.</h1>
+      <p class="lede">An AI sweep of Reddit and X surfaced <b>real researchers and institutions</b> hit by the new federal <b>foreign-influence (FIG) risk</b> rules right now — grants rejected with no appeal, awards frozen in foreign-disclosure limbo, universities standing up research-security teams. Every one is a warm entry point for <b>Certified Secure Researcher</b>.</p>
+      <div class="herobtns">
+        <button class="btn primary" onclick="document.getElementById('leads').scrollIntoView()">Explore the signal feed</button>
+        <a class="btn" href="https://iptalons.com/" target="_blank" rel="noopener">IPTalons CSR ↗</a>
+      </div>
+    </div>
+    <div class="radar-card">
+      <div class="radar" id="radar"></div>
+      <div class="radar-legend">
+        <span><i class="dot d-hot"></i> Hot · rejected now</span>
+        <span><i class="dot d-warm"></i> Warm · in limbo</span>
+        <span><i class="dot d-acad"></i> Academic PI</span>
+        <span><i class="dot d-inst"></i> Institutional</span>
+      </div>
+      <div class="radar-tag mono">FIG-RISK · SBIR/STTR · NSPM-33</div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="stats">
+      <div class="stat c1"><div class="n" data-to="14">0</div><div class="l">Named leads with pain + a CSR angle</div></div>
+      <div class="stat c2"><div class="n" data-to="360"><span class="u">~</span>0</div><div class="l">Tweets swept via your Apify scraper</div></div>
+      <div class="stat c3"><div class="n" data-to="6">0</div><div class="l">Rejection / limbo threads mined on Reddit</div></div>
+      <div class="stat c4"><div class="n" data-to="4">0</div><div class="l">Institutions building research-security teams</div></div>
+    </div>
+    <p class="discreet mono">First compiled 27–28 Jul 2026 · auto-refreshed daily ~7:00 AM · sources: r/SBIR, r/NIH, LinkedIn, X (Apify <span style="color:var(--mut)">apidojo/tweet-scraper</span>).</p>
+  </div>
+</div>
+
+<!-- INSIGHT -->
+<section style="padding-top:10px">
+  <div class="wrap">
+    <div class="insight">
+      <div class="ib">🎯</div>
+      <div>
+        <h3>The tell: the pain is loudest where CSR is the exact fix</h3>
+        <p>Founders aren't asking "should I worry about foreign risk?" — they're posting <b>"my highly-scored proposal was rejected on foreign risk, no appeal, no explanation."</b> That's not awareness-stage. That's a buyer mid-crisis, one resubmission away from needing an audit-ready <b>risk mitigation plan per researcher</b> — CSR's core output. The NIH omnibus resubmission window (~Sep 8) makes the next few weeks the moment.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LEADS -->
+<section id="leads">
+  <div class="wrap">
+    <div class="sec-h"><h2>Live signal feed</h2><span class="idx mono">// 14 prospects</span></div>
+    <p class="sec-sub">Filter by temperature. Each card carries the person's own words, why they're exposed, and the opening line CSR should lead with. Links open the original public post.</p>
+    <div class="filters" id="filters">
+      <button class="chip on" data-f="all">All <span class="ct" id="ct-all"></span></button>
+      <button class="chip" data-f="hot"><span class="c d-hot"></span>Hot <span class="ct" id="ct-hot"></span></button>
+      <button class="chip" data-f="warm"><span class="c d-warm"></span>Warm <span class="ct" id="ct-warm"></span></button>
+      <button class="chip" data-f="acad"><span class="c d-acad"></span>Academic <span class="ct" id="ct-acad"></span></button>
+      <button class="chip" data-f="inst"><span class="c d-inst"></span>Institutional <span class="ct" id="ct-inst"></span></button>
+    </div>
+    <div class="grid" id="grid"></div>
+  </div>
+</section>
+
+<!-- PIPELINE (team only) -->
+<section id="pipeline" class="hidden" style="padding-top:10px">
+  <div class="wrap">
+    <div class="sec-h"><h2>Outreach pipeline</h2><span class="idx mono">// team only</span></div>
+    <p class="sec-sub">Working state for every lead, shared across the team. Set status and notes on any card above — the board and metrics update live. Click a board card to jump to the lead.</p>
+    <div class="metrics" id="metrics"></div>
+    <div class="board" id="board"></div>
+    <div class="card" style="margin-top:20px">
+      <h3>Recent activity</h3>
+      <div class="cap">Last 20 changes</div>
+      <div id="activity"></div>
+    </div>
+  </div>
+</section>
+
+<!-- X FINDINGS -->
+<section style="padding-top:10px">
+  <div class="wrap">
+    <div class="sec-h"><h2>What X told us</h2><span class="idx mono">// channel read</span></div>
+    <p class="sec-sub">Unlike Reddit, public X has almost no individuals venting about FIG rejections — but it's a strong <b>account-based-marketing and competitive-intel</b> channel. Two reads worth showing the founder:</p>
+    <div class="cols">
+      <div class="card">
+        <h3>Institutions standing up research-security teams</h3>
+        <div class="cap">Buy-side signals · target at the org level</div>
+        <div class="row"><div class="ic">🎓</div><div class="tx"><b>James Madison University</b><p>Repeatedly hiring an Assoc. Director of Research Security &amp; International Compliance — building the program from scratch.</p></div><a class="badge" href="https://x.com/JMUresearch/status/2056742003619115298" target="_blank" rel="noopener">X ↗</a></div>
+        <div class="row"><div class="ic">🌤️</div><div class="tx"><b>UCAR (Boulder)</b><p>Hiring an Export &amp; Research Security Compliance Manager.</p></div><a class="badge" href="https://x.com/ScienceCareers/status/2003453403448398278" target="_blank" rel="noopener">X ↗</a></div>
+        <div class="row"><div class="ic">🛡️</div><div class="tx"><b>DoD CTO</b><p>Public thread on grants reviewed &amp; "proposals requiring mitigation" — mitigation plans are CSR's core output.</p></div><a class="badge" href="https://x.com/DoWCTO/status/2009347405997858893" target="_blank" rel="noopener">X ↗</a></div>
+        <div class="row"><div class="ic">🏛️</div><div class="tx"><b>NSF "SECURE" ($67M)</b><p>House Select Committee on China pressure — federal money + scrutiny flooding this exact space.</p></div><a class="badge" href="https://x.com/spotlightoncn/status/2031576124350935242" target="_blank" rel="noopener">X ↗</a></div>
+      </div>
+      <div class="card">
+        <h3>Competitor landscape</h3>
+        <div class="cap">Position CSR against these</div>
+        <div class="row"><div class="ic">🔎</div><div class="tx"><b>Dimensions Research Security</b> <span style="color:var(--dim)">(Digital Science)</span><p>Most vocal rival — "disclosure verification, restricted-entity review, audit-ready docs, NSPM-33." Sells screening + an API.</p></div><a class="badge" href="https://x.com/DSDimensions/status/2049821152055324879" target="_blank" rel="noopener">X ↗</a></div>
+        <div class="row"><div class="ic">🗂️</div><div class="tx"><b>Kharon · WirescreenAI · ASPI Tracker</b><p>Restricted-entity data &amp; China-collaboration screening. Co-marketing with Digital Science / Carnegie Mellon / Huron.</p></div><span class="badge">data</span></div>
+        <div class="row"><div class="ic">📣</div><div class="tx"><b>House Science hearing · NSPM-33</b><p>NASA: shifting "from administrative compliance to active research-security vetting." A quotable content hook.</p></div><a class="badge" href="https://x.com/housescience/status/2001685044838957453" target="_blank" rel="noopener">X ↗</a></div>
+        <div class="row" style="border-top:1px solid var(--line)"><div class="ic">💡</div><div class="tx"><b>CSR's wedge</b><p>Rivals sell a screening database. CSR sells the <b style="color:var(--cyan)">researcher-driven certification + generated mitigation plan</b> — the artifact agencies literally ask for. Lead with that.</p></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- METHOD -->
+<section>
+  <div class="wrap">
+    <div class="sec-h"><h2>How this was built</h2><span class="idx mono">// repeatable</span></div>
+    <p class="sec-sub">Not a one-off list — a pipeline. It can run on a schedule and drip fresh leads weekly.</p>
+    <div class="method">
+      <div class="step"><div class="num mono">01</div><b>Listen</b><p>Swept r/SBIR, r/NIH &amp; X for FIG-risk language: rejections, foreign-disclosure limbo, NSPM-33, MFTRP.</p></div>
+      <div class="step"><div class="num mono">02</div><b>Scrape X</b><p>Ran the existing Apify <span class="mono">apidojo/tweet-scraper</span> across date-bounded FIG queries — ~360 tweets.</p></div>
+      <div class="step"><div class="num mono">03</div><b>Qualify</b><p>Filtered news/noise; kept people describing <em>their own</em> pain, plus institutions hiring RSOs.</p></div>
+      <div class="step"><div class="num mono">04</div><b>Arm</b><p>Every lead ships with a source link + a CSR-specific opening angle. Ready to send.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="brand"><svg class="logo" viewBox="0 0 24 24" fill="none"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3z" stroke="#37e0c8" stroke-width="1.6" fill="rgba(55,224,200,.08)"/></svg> IPTalons CSR · Demand Radar</div>
+    <span class="spacer" style="flex:1"></span>
+    <span>Prospecting intelligence prepared for the IPTalons team · <a href="https://iptalons.com/" target="_blank" rel="noopener">iptalons.com</a></span>
+  </div>
+  <div class="wrap"><p class="discreet">Sources are public posts; outreach should lead value-first (r/SBIR is solicitation-averse). No private data is stored. Leads auto-refresh daily; outreach state is team-only behind login.</p></div>
+</footer>
+
+<script>
+const LEADS=[
+ {t:"hot",tier:"HOT",handle:"u/gigemdh",src:"r/SBIR",pain:"NIGMS CRP proposal (through Phase I/II/IIb, product ready) rejected on foreign-risk assessment.",quote:"Highly scored proposal rejected for failing foreign risk assessment. No appeal. No explanation.",angle:"<b>Open:</b> CSR surfaces the flag & builds the mitigation plan <em>before</em> resubmission. Offer a free team/vendor risk scan.",url:"https://old.reddit.com/r/SBIR/comments/1u3fw9z/foreign_risk/"},
+ {t:"hot",tier:"HOT",handle:"u/FOXN1",src:"r/SBIR",pain:"Grant also killed by the opaque assessment — now DM'ing a grant-writing firm for mitigation help.",quote:"Same happened to our grant last year. It was so painful… we don't even know what organization is in charge.",angle:"<b>Open:</b> Already shopping for exactly what CSR sells. CSR generates the risk mitigation plans & audit-ready docs.",url:"https://old.reddit.com/r/SBIR/comments/1u3fw9z/foreign_risk/"},
+ {t:"hot",tier:"HOT",handle:"u/speculatusmaximus",src:"r/NIH",pain:"All-US-citizen CA biotech; two R43s denied over the founder's past China advisory-board role. Wants to clear the record.",quote:"…notice for both applications that the grants would not be funded due to 'considerations related to foreign risk assessment.'",angle:"<b>Open:</b> A documented CSR mitigation plan is the mechanism to demonstrably retire a legacy affiliation before the next cycle.",url:"https://old.reddit.com/r/NIH/comments/1mpr5f2/foreign_risk_assessment_process_for_sbirs/"},
+ {t:"hot",tier:"HOT",handle:"u/Responsible_Call5640",src:"r/SBIR",pain:"Medtech with 49% Indian ownership, no gov ties — anxious NSF/NIH will reject on it.",quote:"Community's answer: “Disclose it and pray.”",angle:"<b>Open:</b> Replace “pray” with a pre-submission assessment + clean disclosure package.",url:"https://old.reddit.com/r/SBIR/comments/1u3fw9z/foreign_risk/"},
+ {t:"hot",tier:"HOT · PARTNER",handle:"u/04221970",src:"r/SBIR",pain:"Advises many applicants; knows recent MFTRP rejections. Potential channel partner, not just a user.",quote:"It's killing us. Someone with legal understanding may want to look into the constitutionality of this.",angle:"<b>Open:</b> Channel play — CSR as the tool they run for every client before submission.",url:"https://old.reddit.com/r/SBIR/comments/1u3fw9z/foreign_risk/"},
+ {t:"warm",tier:"WARM",handle:"u/Commercial_Hat319",src:"r/SBIR",pain:"NIH SBIR awards frozen; blames the new foreign-assessment process for Phase I→II delays.",quote:"…the new foreign assessment process along with lack of personnel at NIH is slowing this down.",angle:"<b>Open:</b> CSR de-risks the assessment so transitions aren't hostage to it. Get ahead of the next submission.",url:"https://old.reddit.com/r/SBIR/comments/1up4br2/anyone_receive_an_noa_from_the_nih_sbir_program/"},
+ {t:"warm",tier:"WARM",handle:"u/650By-The-Hour",src:"r/SBIR · r/NIH",pain:"NIH STTR founder sweating the JIT foreign-involvement stage; funding is make-or-break.",quote:"Already sent in most JIT documents especially foreign involvement. Tell me this is a good sign?",angle:"<b>Open:</b> CSR turns the foreign-involvement JIT from a coin-flip into a documented, defensible package.",url:"https://old.reddit.com/r/SBIR/comments/1ujesel/po_just_requested_budget_clarification/"},
+ {t:"warm",tier:"WARM",handle:"u/Beautiful_Lemon1294",src:"r/SBIR",pain:"FastTrack Phase II months past start date after filing the SBIR-STTR Foreign Disclosure Form.",quote:"…submitted the SBIR-STTR Foreign Disclosure Form… we've been in a holding pattern.",angle:"<b>Open:</b> Position CSR as the ongoing compliance layer so future disclosures don't stall the award.",url:"https://old.reddit.com/r/SBIR/comments/1sy8uo0/have_any_notice_of_awards_gone_out_for_nih_sbirs/"},
+ {t:"warm",tier:"WARM",handle:"u/No_Active1605",src:"r/SBIR",pain:"20-month NSF SBIR odyssey incl. extra foreign-influence/affiliation paperwork. Thread full of peers.",quote:"Mid-May 2026 – Asked to complete additional documentation regarding foreign influence and affiliations.",angle:"<b>Open:</b> Comment in-thread (34 replies) with how the assessment works; invite the whole cohort to DM.",url:"https://old.reddit.com/r/SBIR/comments/1tr49j9/nsf_sbir_timeline_for_anyone_waiting_on_a_decision/"},
+ {t:"warm",tier:"WARM",handle:"u/FastBrilliant1",src:"r/SBIR",pain:"NSF SBIR applicant trying to structure overseas consultants compliantly before submitting.",quote:"Is there a way to include foreign consultants that would be compliant with NSF requirements?",angle:"<b>Open:</b> Pre-submission structuring is squarely a CSR use case.",url:"https://old.reddit.com/r/SBIR/comments/1uyfh2t/foreign_consultants_in_nsf_sbir_phase_i/"},
+ {t:"acad",tier:"ACADEMIC",handle:"u/Ill-Employment-4518",src:"r/NIH",pain:"New-Investigator R35 stuck in 'Pending Administrative Review' with 2-day MFTRP clarifications.",quote:"…another clarification for Malign Foreign Talent Recruitment Program… within 2 business days or sooner.",angle:"<b>Open:</b> CSR pre-clears MFTRP exposure so PIs aren't blindsided mid-review.",url:"https://old.reddit.com/r/NIH/comments/1t6honp/what_are_the_chances_of_getting_an_award_once/"},
+ {t:"acad",tier:"ACADEMIC · INSTITUTIONAL",handle:"u/ResearchInsider",src:"r/NIH",pain:"Center grants hit by dual-affiliation tracking of every foreign co-author — even US-based work.",quote:"…a new dual-affiliation tracking requirement for all foreign authors on publications connected to their grant.",angle:"<b>Open:</b> CSR's co-authorship mapping is a direct match. Likely a research-admin buyer (institutional deal).",url:"https://old.reddit.com/r/NIH/comments/1rtmrz5/has_anyone_received_recent_guidance_from_nih_on/"},
+ {t:"acad",tier:"NAMED · HIGH-REACH",handle:"Kip Ludwig, PhD",src:"LinkedIn",pain:"UW-Madison neuroengineering professor publicly warning small businesses about foreign-risk rejections.",quote:"Something to be aware of if you are a small business… SBIR/STTR application rejected due to foreign risk.",angle:"<b>Engage openly</b> — credible voice. Comment/repost, don't cold-pitch. A warm relationship = referrals.",url:"https://www.linkedin.com/posts/kip-ludwig-0b66b94_something-to-be-aware-of-if-you-are-a-small-activity-7328059055241887746-djRB"},
+ {t:"inst",tier:"INSTITUTIONAL",handle:"James Madison University",src:"X",pain:"Hiring an Assoc. Director of Research Security & International Compliance (Feb & May 2026) — building a program org-up.",quote:"We're hiring… to provide strategic leadership for JMU's research security program.",angle:"<b>Open:</b> An org hiring an RSO needs a platform. Reach the VP-Research level with CSR as the turnkey layer.",url:"https://x.com/JMUresearch/status/2056742003619115298"},
+];
+
+const grid=document.getElementById('grid');
+function card(l){
+  return `<article class="lead ${l.t}" data-t="${l.t}" data-handle="${l.handle}">
+    <div class="lead-top"><span class="tier ${l.t}">${l.tier}</span><span class="src mono">${l.src}</span></div>
+    <div class="handle">${l.handle}</div>
+    <div class="pain">${l.pain}</div>
+    <blockquote class="quote">${l.quote}</blockquote>
+    <div class="angle">${l.angle}</div>
+    <a class="open" href="${l.url}" target="_blank" rel="noopener">Open source ↗</a>
+  </article>`;
+}
+grid.innerHTML=LEADS.map(card).join('');
+
+// counts
+const counts={all:LEADS.length};
+['hot','warm','acad','inst','comp'].forEach(f=>counts[f]=LEADS.filter(l=>l.t===f).length);
+Object.entries(counts).forEach(([k,v])=>{const e=document.getElementById('ct-'+k);if(e)e.textContent=v;});
+
+// filter
+document.getElementById('filters').addEventListener('click',e=>{
+  const b=e.target.closest('.chip'); if(!b)return;
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));
+  b.classList.add('on');
+  const f=b.dataset.f;
+  document.querySelectorAll('.lead').forEach(el=>{
+    el.classList.toggle('hidden', f!=='all' && el.dataset.t!==f);
+  });
+});
+
+// counters
+function animate(el){
+  const to=+el.dataset.to; let cur=0; const step=Math.max(1,Math.round(to/38));
+  const u=el.querySelector('.u'); const pre=u?u.outerHTML:'';
+  const tick=()=>{cur=Math.min(to,cur+step);el.innerHTML=pre+cur;if(cur<to)requestAnimationFrame(tick);};
+  tick();
+}
+const io=new IntersectionObserver((es)=>{es.forEach(x=>{if(x.isIntersecting){animate(x.target);io.unobserve(x.target);}})},{threshold:.4});
+document.querySelectorAll('.stat .n').forEach(n=>io.observe(n));
+
+// radar
+(function(){
+  const cx=250,cy=250;
+  const blips=[
+    {r:70,a:20,c:'hot'},{r:120,a:200,c:'hot'},{r:95,a:310,c:'hot'},{r:150,a:110,c:'hot'},{r:60,a:250,c:'hot'},
+    {r:175,a:60,c:'warm'},{r:135,a:160,c:'warm'},{r:200,a:230,c:'warm'},{r:110,a:350,c:'warm'},{r:165,a:15,c:'warm'},
+    {r:190,a:130,c:'acad'},{r:145,a:290,c:'acad'},{r:100,a:180,c:'acad'},
+    {r:210,a:80,c:'inst'},{r:80,a:150,c:'inst'},{r:180,a:330,c:'inst'}
+  ];
+  const pt=(r,a)=>[cx+r*Math.cos(a*Math.PI/180),cy+r*Math.sin(a*Math.PI/180)];
+  let rings='';[60,120,180,225].forEach(r=>rings+=`<circle class="ring" cx="250" cy="250" r="${r}"/>`);
+  let bl='';blips.forEach((b,i)=>{const[x,y]=pt(b.r,b.a);bl+=`<circle class="blip ${b.c}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.4" style="animation-delay:${(-i*0.12).toFixed(2)}s"/>`;});
+  document.getElementById('radar').innerHTML=`
+  <svg viewBox="0 0 500 500">
+    <defs>
+      <radialGradient id="sw" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="rgba(55,224,200,.35)"/>
+        <stop offset="100%" stop-color="rgba(55,224,200,0)"/>
+      </radialGradient>
+    </defs>
+    ${rings}
+    <line class="cross" x1="250" y1="25" x2="250" y2="475"/>
+    <line class="cross" x1="25" y1="250" x2="475" y2="250"/>
+    <g class="sweep"><path d="M250 250 L250 30 A220 220 0 0 1 405 95 Z" fill="url(#sw)"/><line x1="250" y1="250" x2="250" y2="30" stroke="rgba(55,224,200,.6)" stroke-width="1.5"/></g>
+    ${bl}
+    <circle cx="250" cy="250" r="3" fill="#37e0c8"/>
+  </svg>`;
+})();
+</script>
+
+<!-- team modals -->
+<div class="modal-bg" id="loginModal">
+  <div class="modal" style="max-width:380px">
+    <h3>Team access</h3>
+    <p style="color:var(--mut);font-size:13.5px;margin:0 0 14px">Enter the team password to unlock the outreach pipeline — statuses, notes and compose drafts.</p>
+    <input type="password" id="pwInput" class="tin" placeholder="Team password" autocomplete="current-password">
+    <div id="loginErr" style="color:var(--red);font-size:12.5px;margin-top:8px;display:none">Wrong password — try again.</div>
+    <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end">
+      <button class="btn" id="loginCancel">Cancel</button>
+      <button class="btn primary" id="loginGo">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="composeModal">
+  <div class="modal">
+    <h3 id="cmTitle">Compose</h3>
+    <p style="color:var(--mut);font-size:12.5px;margin:0">Value-first drafts — edit the [bracketed] parts, then copy &amp; send manually. Never auto-post to r/SBIR.</p>
+    <div class="tabs" id="cmTabs"></div>
+    <textarea class="cm-text" id="cmText"></textarea>
+    <div style="display:flex;gap:10px;margin-top:14px;align-items:center">
+      <span id="cmCopied" style="color:var(--green);font-size:12.5px;visibility:hidden">Copied ✓</span>
+      <span style="flex:1"></span>
+      <button class="btn" id="cmClose">Close</button>
+      <button class="btn primary" id="cmCopy">Copy draft</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== workflow layer (team) =====
+const $id=x=>document.getElementById(x);
+const STATUS=[['new','New'],['contacted','Contacted'],['replied','Replied'],['call','Call booked'],['won','Won'],['lost','Lost']];
+const STCOLOR={new:'var(--dim)',contacted:'var(--cyan)',replied:'var(--amber)',call:'var(--violet)',won:'var(--green)',lost:'var(--red)'};
+let AUTHED=false, WSTATE={leads:{},activity:[]};
+
+// dynamic counts (page stays correct as the daily task appends leads)
+$id('ctaLeads').textContent=`View ${LEADS.length} leads →`;
+const idx=document.querySelector('#leads .idx'); if(idx)idx.textContent=`// ${LEADS.length} prospects`;
+const heroN=document.querySelector('.stat.c1 .n'); if(heroN)heroN.dataset.to=LEADS.length;
+
+const leadOf=h=>LEADS.find(l=>l.handle===h);
+const stOf=h=>WSTATE.leads[h]||{status:'new',notes:'',owner:''};
+const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const strip=s=>{const d=document.createElement('div');d.innerHTML=s;return d.textContent;};
+const rel=iso=>{const s=(Date.now()-new Date(iso))/1e3;if(s<90)return'just now';if(s<5400)return Math.round(s/60)+'m ago';if(s<129600)return Math.round(s/3600)+'h ago';return Math.round(s/86400)+'d ago';};
+async function api(path,body){
+  const r=await fetch(path,{method:body?'POST':'GET',credentials:'same-origin',
+    headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
+  if(!r.ok)throw Object.assign(new Error('api'),{status:r.status});
+  return r.json();
+}
+
+// ---- decorate lead cards with workflow controls ----
+function wfbar(l){
+  const st=stOf(l.handle);
+  const opts=STATUS.map(([v,t])=>`<option value="${v}" ${v===st.status?'selected':''}>${t}</option>`).join('');
+  return `<div class="wfbar">
+    <select class="wf-status" title="Status">${opts}</select>
+    <input class="wf-owner" placeholder="owner" value="${esc(st.owner)}" title="Who owns this lead">
+    <button class="btn-mini wf-notes-btn">Notes${st.notes?' ·':''}</button>
+    <button class="btn-mini wf-compose">✉ Compose</button>
+    <span class="wf-upd">${st.updatedAt?('updated '+rel(st.updatedAt)):''}</span>
+  </div>
+  <textarea class="wfnotes hidden" placeholder="Notes — next step, follow-up date, context…">${esc(st.notes)}</textarea>`;
+}
+function decorate(){
+  document.querySelectorAll('.lead').forEach(el=>{
+    const l=leadOf(el.dataset.handle); if(!l)return;
+    el.querySelectorAll('.wfbar,.wfnotes,.stpill').forEach(n=>n.remove());
+    const st=stOf(l.handle);
+    const pill=document.createElement('span');
+    pill.className='stpill'; pill.textContent=st.status; pill.style.color=STCOLOR[st.status];
+    el.querySelector('.lead-top').insertBefore(pill,el.querySelector('.src'));
+    el.insertAdjacentHTML('beforeend',wfbar(l));
+  });
+}
+async function save(handle,patch){
+  try{
+    const r=await api('/api/lead',{handle,patch});
+    WSTATE.leads[handle]=r.lead;
+    const now=new Date().toISOString();
+    Object.entries(patch).forEach(([f,v])=>WSTATE.activity.unshift({at:now,handle,field:f,to:v}));
+    renderTeam();
+  }catch(e){ if(e.status===401){AUTHED=false;teamUI();} }
+}
+
+// ---- board / metrics / activity ----
+function renderBoard(){
+  $id('board').innerHTML=STATUS.map(([v,t])=>{
+    const items=LEADS.filter(l=>stOf(l.handle).status===v);
+    return `<div class="bcol"><h4><span style="color:${STCOLOR[v]}">${t}</span><span>${items.length}</span></h4>
+      ${items.map(l=>`<div class="bcard" data-h="${esc(l.handle)}"><div class="bh">${esc(l.handle)}</div><div class="bs">${esc(l.src)}${stOf(l.handle).owner?' · '+esc(stOf(l.handle).owner):''}</div></div>`).join('')}
+    </div>`;
+  }).join('');
+}
+function renderMetrics(){
+  const n=LEADS.length, get=v=>LEADS.filter(l=>stOf(l.handle).status===v).length;
+  const touched=n-get('new'), replied=get('replied')+get('call')+get('won'), calls=get('call')+get('won');
+  $id('metrics').innerHTML=`
+    <div class="stat c1"><div class="n">${touched}<span class="u">/${n}</span></div><div class="l">Leads touched</div></div>
+    <div class="stat c2"><div class="n">${replied}</div><div class="l">Replies (incl. calls & wins)</div></div>
+    <div class="stat c3"><div class="n">${calls}</div><div class="l">Calls booked</div></div>
+    <div class="stat c4"><div class="n">${get('won')}</div><div class="l">Won</div></div>`;
+}
+function renderActivity(){
+  const rows=WSTATE.activity.slice(0,20).map(a=>{
+    const what=a.field==='status'?`status → <b style="color:${STCOLOR[a.to]||'var(--ink)'}">${esc(a.to)}</b>`:(a.field==='notes'?'notes updated':`owner → <b>${esc(a.to)}</b>`);
+    return `<div class="act-row"><span class="at mono">${rel(a.at)}</span><span><b>${esc(a.handle)}</b> · ${what}</span></div>`;
+  }).join('');
+  $id('activity').innerHTML=rows||'<div class="act-row">No activity yet — set a status on any lead card.</div>';
+}
+function renderTeam(){ decorate(); renderBoard(); renderMetrics(); renderActivity(); }
+
+// ---- compose templates (drafts only; human edits & sends) ----
+function templates(l){
+  const pain=strip(l.pain), name=l.handle.replace(/^u\//,'');
+  const t=[];
+  if(/r\//.test(l.src)) t.push(
+    ['Reddit comment',`Adding a data point for anyone hitting this: the foreign-risk assessments are opaque, but they aren't random — [the trigger in their case, e.g. a past advisory role / foreign vendor / collaborator] is exactly the kind of thing that gets flagged. The one lever applicants control is a documented mitigation plan filed with the (re)submission. We've put together a checklist of what these reviews look at — happy to share it with anyone here, no strings. DM me.`],
+    ['Reddit DM',`Hi ${name} — saw your post in ${l.src} about ${pain.slice(0,120).toLowerCase().replace(/\.$/,'')}[…adjust]. Didn't want to pitch in-thread, the sub rightly hates that.\n\nWe work on exactly this at IPTalons: CSR turns the opaque foreign-risk assessment into a documented, audit-ready mitigation plan per researcher — before you (re)submit. If useful I'll send over our checklist of what the assessments flag: free, no strings. And if it resonates, happy to do a quick call ahead of the ~Sep 8 resubmission window.`]);
+  if(/X/.test(l.src)) t.push(
+    ['X reply',`This is hitting a lot of SBIR/STTR teams right now. The assessments are opaque but the triggers are consistent — we keep a checklist of what gets flagged and what a mitigation plan needs to cover. Happy to share, no strings.`]);
+  if(/LinkedIn/.test(l.src)) t.push(
+    ['LinkedIn',`${name.split(',')[0]} — thank you for flagging this publicly; most small businesses find out the hard way. We work on this daily at IPTalons (researcher-level certification + generated, audit-ready mitigation plans — the artifact agencies actually ask for). Would value comparing notes on what you're seeing, and glad to share our data on what's triggering the rejections.`]);
+  t.push(['Email',`Subject: ${/inst/.test(l.t)?'Standing up research security — a faster path':'Before your next submission — foreign-risk assessment'}\n\nHi [name],\n\n[Signal: reference where you saw them — "${pain.slice(0,110)}"]\n\n${/inst/.test(l.t)
+    ?`That role usually lands with a mountain of NSPM-33 / MFTRP process to build from scratch. IPTalons CSR gives every researcher a certification plus a generated, audit-ready mitigation plan — the artifact agencies actually ask for — so the program starts with tooling instead of spreadsheets.\n\nWorth a 20-minute look as you scope the program?`
+    :`The foreign-risk assessment is opaque, but the triggers are consistent. IPTalons CSR runs the assessment before the agency does: it surfaces what will get flagged and generates the documented mitigation plan that changes outcomes on (re)submission.\n\nHappy to share our checklist of what reviewers look at — no strings. If it's useful, a 15-minute call before the resubmission window?`}\n\n[signature]`]);
+  return t;
+}
+let cmLead=null;
+function openCompose(handle){
+  const l=leadOf(handle); if(!l)return; cmLead=l;
+  const tp=templates(l);
+  $id('cmTitle').textContent=`Compose · ${l.handle}`;
+  $id('cmTabs').innerHTML=tp.map(([k],i)=>`<button class="tab ${i===0?'on':''}" data-i="${i}">${k}</button>`).join('');
+  $id('cmText').value=tp[0][1];
+  $id('composeModal').classList.add('open');
+}
+$id('cmTabs').addEventListener('click',e=>{
+  const b=e.target.closest('.tab'); if(!b||!cmLead)return;
+  document.querySelectorAll('#cmTabs .tab').forEach(t=>t.classList.remove('on')); b.classList.add('on');
+  $id('cmText').value=templates(cmLead)[+b.dataset.i][1];
+});
+$id('cmCopy').addEventListener('click',async()=>{
+  try{await navigator.clipboard.writeText($id('cmText').value);}catch{ $id('cmText').select();document.execCommand('copy'); }
+  $id('cmCopied').style.visibility='visible'; setTimeout(()=>$id('cmCopied').style.visibility='hidden',1600);
+});
+$id('cmClose').addEventListener('click',()=>$id('composeModal').classList.remove('open'));
+
+// ---- events on the grid (delegated) ----
+grid.addEventListener('change',e=>{
+  const el=e.target.closest('.lead'); if(!el)return;
+  if(e.target.classList.contains('wf-status')) save(el.dataset.handle,{status:e.target.value});
+});
+grid.addEventListener('focusout',e=>{
+  const el=e.target.closest('.lead'); if(!el)return;
+  const h=el.dataset.handle, st=stOf(h);
+  if(e.target.classList.contains('wf-owner')&&e.target.value!==st.owner) save(h,{owner:e.target.value});
+  if(e.target.classList.contains('wfnotes')&&e.target.value!==st.notes) save(h,{notes:e.target.value});
+});
+grid.addEventListener('click',e=>{
+  const el=e.target.closest('.lead'); if(!el)return;
+  if(e.target.classList.contains('wf-notes-btn')) el.querySelector('.wfnotes').classList.toggle('hidden');
+  if(e.target.classList.contains('wf-compose')) openCompose(el.dataset.handle);
+});
+$id('board').addEventListener('click',e=>{
+  const b=e.target.closest('.bcard'); if(!b)return;
+  const el=document.querySelector(`.lead[data-handle="${CSS.escape(b.dataset.h)}"]`); if(!el)return;
+  document.querySelector('.chip[data-f="all"]').click();
+  el.scrollIntoView({behavior:'smooth',block:'center'});
+  el.classList.add('flash'); setTimeout(()=>el.classList.remove('flash'),1800);
+});
+
+// ---- auth ----
+function teamUI(){
+  $id('teamBtn').textContent=AUTHED?'Team · signed in':'Team login';
+  $id('pipeline').classList.toggle('hidden',!AUTHED);
+  if(!AUTHED) document.querySelectorAll('.wfbar,.wfnotes,.stpill').forEach(n=>n.remove());
+}
+async function initTeam(){
+  try{
+    const me=await api('/api/me');
+    if(me.authed){ AUTHED=true; WSTATE=await api('/api/state'); renderTeam(); }
+  }catch{}
+  teamUI();
+}
+$id('teamBtn').addEventListener('click',async()=>{
+  if(AUTHED){ if(confirm('Sign out of team view?')){ await api('/api/logout',{}); AUTHED=false; teamUI(); } }
+  else { $id('loginErr').style.display='none'; $id('loginModal').classList.add('open'); $id('pwInput').focus(); }
+});
+async function doLogin(){
+  try{
+    await api('/api/login',{password:$id('pwInput').value});
+    $id('loginModal').classList.remove('open'); $id('pwInput').value='';
+    AUTHED=true; WSTATE=await api('/api/state'); renderTeam(); teamUI();
+  }catch{ $id('loginErr').style.display='block'; }
+}
+$id('loginGo').addEventListener('click',doLogin);
+$id('pwInput').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+$id('loginCancel').addEventListener('click',()=>$id('loginModal').classList.remove('open'));
+document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
+
+initTeam();
+</script>
+</body>
+</html>

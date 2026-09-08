@@ -1,0 +1,5 @@
+# Copy to .dev.vars for local development and replace this synthetic password.
+# Never commit .dev.vars or provider credentials.
+APP_PASSWORD=replace-with-a-long-local-only-password
+# AI is disabled in wrangler.jsonc. Enable deliberately only with spending controls.
+# ANTHROPIC_API_KEY=

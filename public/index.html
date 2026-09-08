@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IPTalons — Proposals</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; }
+    body { font-family: 'DM Sans', sans-serif; background: #F4F7EE; color: #1F2A1B; -webkit-font-smoothing: antialiased; }
+
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #D5DBC8; border-radius: 999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #A8B0A0; }
+
+    .flex { display: flex; }
+    .flex-col { flex-direction: column; }
+    .items-center { align-items: center; }
+    .items-start { align-items: flex-start; }
+    .justify-center { justify-content: center; }
+    .justify-between { justify-content: space-between; }
+    .justify-end { justify-content: flex-end; }
+    .flex-1 { flex: 1; }
+    .flex-wrap { flex-wrap: wrap; }
+    .gap-1 { gap: 4px; } .gap-1\.5 { gap: 6px; } .gap-2 { gap: 8px; } .gap-3 { gap: 12px; }
+    .gap-4 { gap: 16px; } .gap-6 { gap: 24px; } .gap-8 { gap: 32px; }
+    .grid { display: grid; } .col-span-2 { grid-column: span 2; }
+    .w-full { width: 100%; } .h-full { height: 100%; }
+    .overflow-hidden { overflow: hidden; } .overflow-auto { overflow: auto; }
+    .relative { position: relative; } .absolute { position: absolute; } .fixed { position: fixed; }
+    .inset-0 { inset: 0; } .z-10 { z-index: 10; }
+    .font-medium { font-weight: 500; } .font-semibold { font-weight: 600; } .font-bold { font-weight: 700; }
+    .text-xs { font-size: 12px; } .text-sm { font-size: 14px; } .text-base { font-size: 16px; }
+    .text-lg { font-size: 18px; } .text-xl { font-size: 20px; } .text-2xl { font-size: 24px; }
+    .text-left { text-align: left; } .text-right { text-align: right; } .text-center { text-align: center; }
+    .rounded { border-radius: 6px; } .rounded-lg { border-radius: 10px; } .rounded-full { border-radius: 9999px; }
+    .border { border: 1px solid #E2E5DC; }
+    .p-2 { padding: 8px; } .p-3 { padding: 12px; } .p-4 { padding: 16px; }
+    .px-3 { padding-left: 12px; padding-right: 12px; }
+    .px-4 { padding-left: 16px; padding-right: 16px; }
+    .px-5 { padding-left: 20px; padding-right: 20px; }
+    .py-1\.5 { padding-top: 6px; padding-bottom: 6px; }
+    .py-2 { padding-top: 8px; padding-bottom: 8px; }
+    .py-2\.5 { padding-top: 10px; padding-bottom: 10px; }
+    .mt-1 { margin-top: 4px; } .mt-2 { margin-top: 8px; }
+    .mb-2 { margin-bottom: 8px; } .mb-4 { margin-bottom: 16px; }
+    .whitespace-nowrap { white-space: nowrap; }
+    .select-none { user-select: none; }
+    .cursor-pointer { cursor: pointer; }
+    .opacity-50 { opacity: 0.5; }
+    .cursor-not-allowed { cursor: not-allowed; }
+    .shadow-sm { box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .transition-all { transition: all 0.15s ease; }
+    .inline-flex { display: inline-flex; }
+
+    /* IPTalons brand (sage/forest green on warm off-white) */
+    .bg-blue-600 { background: #4A7C2E; }
+    .bg-blue-700 { background: #3D6826; }
+    .bg-blue-800 { background: #2D4422; }
+    .text-white { color: #fff; }
+    .bg-white { background: #fff; }
+    .text-gray-700 { color: #3A3F32; }
+    .border-gray-300 { border-color: #C5C9BC; }
+    .bg-gray-50 { background: #F7F8F4; }
+    .bg-gray-100 { background: #EFF2E8; }
+    .bg-gray-200 { background: #E2E5DC; }
+    .text-gray-600 { color: #5F6557; }
+    .text-gray-400 { color: #9A9D90; }
+    .hover\:bg-gray-50:hover { background: #F7F8F4; }
+    .hover\:bg-gray-100:hover { background: #EFF2E8; }
+    .hover\:bg-gray-200:hover { background: #E2E5DC; }
+    .bg-emerald-600 { background: #558B2F; }
+    .hover\:bg-emerald-700:hover { background: #426F23; }
+    .bg-red-600 { background: #B8493A; }
+    .hover\:bg-red-700:hover { background: #963A2D; }
+    .active\:bg-blue-800:active { background: #2D4422; }
+    .active\:bg-gray-100:active { background: #EFF2E8; }
+    .active\:bg-gray-200:active { background: #E2E5DC; }
+
+    @keyframes progress-bar { 0% { width: 0%; margin-left: 0; } 50% { width: 60%; margin-left: 20%; } 100% { width: 0%; margin-left: 100%; } }
+    @keyframes radar-sweep { to { transform: rotate(360deg); } }
+    @keyframes radar-blip { 0%, 100% { opacity: 0.25; transform: scale(0.7); } 50% { opacity: 1; transform: scale(1.2); } }
+    @media (prefers-reduced-motion: reduce) {
+      .radar-anim-sweep, .radar-anim-blip { animation: none !important; }
+    }
+    @keyframes bounce { 0%, 80%, 100% { transform: scale(0); opacity: 0.3; } 40% { transform: scale(1.0); opacity: 1; } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-in { animation: fadeIn 0.2s ease forwards; }
+
+    @media print {
+      body { background: white; }
+      #root > div > div:first-child,
+      #root > div > div:last-child { display: none !important; }
+    }
+
+    /* Mobile: collapse sidebar at narrow widths */
+    @media (max-width: 900px) {
+      .ip-sidebar { display: none !important; }
+      .ip-sidebar.ip-sidebar-open { display: flex !important; position: fixed !important; left: 0; top: 0; bottom: 0; z-index: 100; }
+      .ip-hamburger { display: flex !important; }
+    }
+    .ip-hamburger { display: none; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- AI backend shim -->
+  <script>
+    window.claude = {
+      complete: async ({ messages, system, max_tokens } = {}) => {
+        const model = localStorage.getItem('ip_model') || 'claude-opus-4-7';
+        const headers = { 'Content-Type': 'application/json' };
+        const resp = await fetch('/api/claude', { method: 'POST', headers, body: JSON.stringify({ messages, system, model, max_tokens }) });
+        if (!resp.ok) {
+          let detail = '';
+          try { detail = (await resp.json()).error || ''; } catch {}
+          throw new Error(detail || `Claude API request failed (${resp.status})`);
+        }
+        const data = await resp.json();
+        return data.text;
+      },
+    };
+  </script>
+
+  <script type="text/babel" src="ip-components.jsx"></script>
+  <script type="text/babel" src="ip-screens.jsx"></script>
+  <script type="text/babel" src="ip-app.jsx"></script>
+</body>
+</html>

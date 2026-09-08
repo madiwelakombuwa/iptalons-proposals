@@ -1,0 +1,7 @@
+Node v22.17.0; npm 11.4.2; npm ci --ignore-scripts succeeded.
+Locked TypeScript 5.9.3, Wrangler 3.114.17, Anthropic SDK 0.40.1, workers-types 4.20260521.1.
+
+tsc --noEmit exited 2:
+src/worker.ts(651,9): error TS2322: ScheduledEvent is incompatible with ExportedHandlerScheduledHandler; expected ScheduledController.
+
+JSX syntax transpilation: ip-components.jsx, ip-screens.jsx, ip-app.jsx: zero syntax diagnostics. This does not establish browser rendering or runtime correctness.

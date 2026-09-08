@@ -1,0 +1,86 @@
+{
+  "package.json": {
+    "sha256": "da9a73596bc7b3b9a4b89d7548f4201c16370421781272d0e5de188ff31524b7",
+    "bytes": 374
+  },
+  "package-lock.json": {
+    "sha256": "d157e0151e679d283a97e477da919748c1d772b306d9063135ca6e3f12bfdf49",
+    "bytes": 69102
+  },
+  "tsconfig.json": {
+    "sha256": "d04a9c5e887741237c7628013495cdf22788ece09bf7f375871c19c7da750689",
+    "bytes": 285
+  },
+  "wrangler.jsonc": {
+    "sha256": "ddae858269376d06e6ff1699cdbc51cf1def5e2978c44ba09aee4d1a6e55c645",
+    "bytes": 657
+  },
+  ".gitignore": {
+    "sha256": "f3f5bc6de4a9a87ae0b51f4714b2909c7346d1921196577c796d63adb3fd8049",
+    "bytes": 56
+  },
+  "src/worker.ts": {
+    "sha256": "9f2f2c6c501ba600ba973d233f3c9a8bd28547346999db6ba40c107602091182",
+    "bytes": 42051
+  },
+  "scripts/news-sweep.py": {
+    "sha256": "ff2f82f444975c695b451a1f91d0e7961e34dc0bbae905085fef939d1e8d1733",
+    "bytes": 4915
+  },
+  "csr-demand-radar/src/index.js": {
+    "sha256": "95391fc45e53e97d3e5d6795b7244ce86fc407e650c149169a93639cfbf180c9",
+    "bytes": 9364
+  },
+  "csr-demand-radar/wrangler.jsonc": {
+    "sha256": "fb8578753f873fef26893d9919962dc5df1c2f28622d1d022bb058f5a3613163",
+    "bytes": 308
+  },
+  "csr-demand-radar/public/index.html": {
+    "sha256": "8e4a06b26d73566e63a11eb48abed9655fafe564caf7f9ece5fe0877c6517c4f",
+    "bytes": 47665
+  },
+  "csr-demand-radar/README.md": {
+    "sha256": "a55ae0fa1e441889d131de9d93e833c514815667bf406798cfec5a3a2eb25a29",
+    "bytes": 411
+  },
+  "public/index.html": {
+    "sha256": "9f454f997a27e82873517da732a75dd95c9a8961f6ef3d1286abe229cb9ac203",
+    "bytes": 7269
+  },
+  "public/ip-app.jsx": {
+    "sha256": "57ecd5f85f55e71c357a2a4f1f3428fc9429e4454657372e09cb9afd8d8d5cb6",
+    "bytes": 48767
+  },
+  "public/ip-components.jsx": {
+    "sha256": "c0c3d719bd122ad6abc56eb3804e913eaca7326964a0f6ec46af5693efe6412d",
+    "bytes": 65980
+  },
+  "public/ip-screens.jsx": {
+    "sha256": "d6b51f64b84f903477ee47d5c27522269438d5e6798544f6e02206f4618d1797",
+    "bytes": 186911
+  },
+  "public/logo-mark-white.webp": {
+    "sha256": "a7db429e407e9fb4eecc9727177e34bd0b46e424032b125cc463bb07d015c36f",
+    "bytes": 1878
+  },
+  "public/logo-mark.webp": {
+    "sha256": "46550ac3577c3bdc327d4eb51987e8bcad03688791d73fa3b3078f7ccaed4db1",
+    "bytes": 6310
+  },
+  "public/logo-white.webp": {
+    "sha256": "8a8f6d4a779a34ce57bf6b8371567bb54ebcf01cf17191340725425443dcc2eb",
+    "bytes": 9312
+  },
+  "public/logo.webp": {
+    "sha256": "b101f15cbb51e3db0c81f5d821f03c81fc396d181be126fc340f6c91db779180",
+    "bytes": 10470
+  },
+  "public/radar-to-signature.html": {
+    "sha256": "8282a8779108657f4dcd81dae90757ebf62f7949b9090b550f9fa78250721390",
+    "bytes": 94282
+  },
+  "public/share.html": {
+    "sha256": "408b77d9edfe7d0ff275a56cea4d90c1f5c584293f3ecdc2667bfde1dadfd426",
+    "bytes": 2590
+  }
+}

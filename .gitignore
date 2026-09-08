@@ -1,0 +1,17 @@
+node_modules/
+.wrangler/
+.dev.vars
+.env
+.env.*
+.dev.vars.*
+!.env.example
+!.dev.vars.example
+**/TEAM_PASSWORD.txt
+**/.claude/
+exports/
+backups/
+dist/
+.build/
+coverage/
+*.log
+.DS_Store

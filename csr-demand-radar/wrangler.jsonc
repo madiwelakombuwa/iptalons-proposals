@@ -1,0 +1,10 @@
+{
+  "name": "iptalons-csr-radar",
+  "main": "src/index.js",
+  "compatibility_date": "2025-06-01",
+  "account_id": "4cf69b53ed004e82546e4963ff7a412f",
+  "assets": { "directory": "./public", "binding": "ASSETS" },
+  "kv_namespaces": [
+    { "binding": "STATE", "id": "def642157e14452cbc18d7d78ff5c2d0" }
+  ]
+}

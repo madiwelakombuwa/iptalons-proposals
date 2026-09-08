@@ -1,0 +1,16 @@
+{
+  "method": "Final probes: Node handler tests with fake keys, mocked SDK post and in-memory KV; global fetch blocked. An earlier harness attempt used the Node SDK fetch implementation and received an invalid-key response for a synthetic audit message; no real credentials or customer data used.",
+  "results": [
+    "CONFIRMED: anonymous AI request reaches mocked provider using server credential, accepts request without user identity or subscription.",
+    "CONTROL: anonymous shares list is correctly denied (401).",
+    "CONFIRMED: 64000 max_tokens request fails locally in locked SDK non-streaming timeout validation.",
+    "CONFIRMED: public share HTML embeds internal fields from the complete proposal object.",
+    "CONFIRMED: same proposal ID overwrites original client and reuses public token.",
+    "CONFIRMED: two concurrent page views result in only one additional stored view under deterministic mocked KV.",
+    "CONFIRMED: displayed view total saturates at 200.",
+    "CONFIRMED: share listing ignores pagination cursor and omits record 1001.",
+    "CONFIRMED: freshenFollowUps silently changes an overdue non-demo record date.",
+    "CONFIRMED: failed digest email still commits digest:seen before provider success.",
+    "CONFIRMED: ingested URL can break out of quoted href in digest HTML; attribute escaping is incomplete."
+  ]
+}
