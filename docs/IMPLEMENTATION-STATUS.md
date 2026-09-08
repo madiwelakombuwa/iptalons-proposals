@@ -33,3 +33,13 @@ The selected first release is a managed IPTalons workspace, owned on GitHub by `
 10. Establish the managed commercial offer, support process, customer agreement and invoicing. Self-service subscriptions, Stripe webhooks and multi-company tenancy are deferred by the chosen release scope.
 
 The source changes above are an initial hardening increment, not a declaration that all audit findings are closed. Existing live behavior remains unchanged until an explicit deployment occurs.
+
+## Cloudflare CLI staging provision
+
+The CLI is authenticated as harsha@lookermetrics.com with access to the app’s existing Skyabove account (`aa96f50b9174b128d2cbe8f6db54b940`). Created an empty staging KV namespace (`a4d813d127874f569188f0c3d3daf77a`) and empty D1 database `iptalons-proposals-staging` (`e0d1b5d2-9651-4a59-90cb-3ea9db8afe71`). Cloudflare placed this test database in APAC; no production residency decision is implied.
+
+The `staging` environment binds these separate resources, disables cron, AI, workers.dev and preview URLs, and has no routes. The staging Worker is uploaded as version `9a73bf66-f32f-426a-8dfc-6a11db591489`, with no public targets or secrets configured. Existing production storage has not been modified or backed up in this step. D1 application tables, identity integration and shared-data APIs remain to be implemented.
+
+The private GitHub repository has been published under madiwelakombuwa; its initial CI run passed.
+
+The user confirmed Skyabove as the hosting account for now. Staging remains isolated from the existing production KV namespace.

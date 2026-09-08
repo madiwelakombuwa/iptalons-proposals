@@ -12,7 +12,7 @@ The UI currently loads React, Babel, and Chart.js from external CDNs. A producti
 
 ## Deployment status
 
-`wrangler.jsonc` retains the existing Worker account and KV identifiers. Do not replace or migrate that storage without a verified backup. No staging resources or production deployment were created in this hardening pass. The sibling Radar Worker has a separate configuration and requires its own review.
+`wrangler.jsonc` retains the existing Worker account and KV identifiers. Do not replace or migrate that storage without a verified backup. Staging has separate KV and D1 resources in the Skyabove account. Its Worker configuration disables public routes, preview URLs, cron and AI. Production has not been redeployed. The sibling Radar Worker has a separate configuration and requires its own review.
 
 AI defaults to disabled. Login and AI rate-limit bindings are configured; they are approximate per-location limits, not a global financial budget. Individual identities, durable usage accounting, and provider spending controls are required before paid access.
 
