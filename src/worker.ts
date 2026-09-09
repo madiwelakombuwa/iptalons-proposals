@@ -15,6 +15,7 @@ interface Env extends WorkerBindings {
   APIFY_API_TOKEN: string;
   RESEND_API_KEY?: string;
   EMAIL_FROM?: string;
+  APP_ORIGIN?: string;
   MAILER_URL?: string; // Apps Script mailer web app (send_email command)
   MAILER_SECRET?: string;
   DIGEST_TO?: string; // recipient(s) for the daily summary email, comma-separated
@@ -560,7 +561,7 @@ export default {
     if (env.APIFY_API_TOKEN) await collectApifySignals(env.SHARES, env.APIFY_API_TOKEN);
     const configured = env.RESEND_API_KEY || (env.MAILER_URL && env.MAILER_SECRET);
     if (!configured || !env.DIGEST_TO) return;
-    const origin = "https://iptalons-proposals.skyabove.workers.dev";
+    const origin = env.APP_ORIGIN || "https://iptalons-proposals.skyabove.workers.dev";
     const digest = await buildDigest(env, origin);
     const to = env.DIGEST_TO.split(",").map((s) => s.trim()).filter(Boolean);
     const sent = await dispatchEmail(env, to, digest.subject, digest.html, digest.text);

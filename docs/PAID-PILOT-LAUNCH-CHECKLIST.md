@@ -47,7 +47,7 @@
 ## Production
 
 - [ ] Confirm the Cloudflare account that will permanently own production.
-- [ ] Confirm the production hostname and DNS control.
+- [x] Reserve `proposals.iptalons.com` as the eventual production hostname. Launch the first pilot on the Skyabove `workers.dev` origin; DNS cutover remains outstanding.
 - [ ] Complete the production inventory. Worker, bindings, secret names, and empty KV keyset are documented; browser-local record sets and published links still require export from every profile that used the legacy origin.
 - [ ] Provision isolated production D1/KV resources; do not reuse staging bindings.
 - [ ] Configure production Access applications and the narrow recipient route.
