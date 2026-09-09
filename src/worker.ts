@@ -443,11 +443,14 @@ export default {
       if (!proposal || typeof proposal !== "object" || Array.isArray(proposal) || !proposalId || proposalId.length > 128) return json({ error: "proposal with id required" }, 400);
 
       const now = new Date().toISOString();
+      const proposedExpiry = Date.parse(String(proposal.validUntil || ""));
+      const maxExpiry = Date.now() + 180 * DAY_MS;
+      const expiresAt = new Date(Number.isFinite(proposedExpiry) && proposedExpiry > Date.now() && proposedExpiry <= maxExpiry ? proposedExpiry + DAY_MS - 1 : Date.now() + 90 * DAY_MS).toISOString();
       const share: ShareRecord = {
         token: newShareToken(), proposalId,
         name: String(proposal.name || "Proposal").slice(0, 300),
         prospectName: String((publicProposal(proposal).prospect as { name: string }).name),
-        createdAt: now, updatedAt: now, proposal: publicProposal(proposal), views: [], emails: [],
+        createdAt: now, updatedAt: now, expiresAt, proposal: publicProposal(proposal), views: [], emails: [],
       };
       await createPublished(env.DB, env.SHARES, share, identity?.email || "legacy-workspace");
       return json({ ...shareSummary(share), url: `${url.origin}/p/${share.token}` });

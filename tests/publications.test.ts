@@ -21,7 +21,7 @@ function fixture() {
 
 test("D1 publications keep immutable content, exact concurrent view counts and revocation", async () => {
   const { sql, db, kv } = fixture();
-  const share: ShareRecord = { token: "abcdefghjkmnpqr", proposalId: "p1", name: "Proposal", prospectName: "University", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), proposal: { id: "p1", name: "Public copy" }, views: [], emails: [] };
+  const share: ShareRecord = { token: "abcdefghjkmnpqr", proposalId: "p1", name: "Proposal", prospectName: "University", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), expiresAt: new Date(Date.now()+86400000).toISOString(), proposal: { id: "p1", name: "Public copy" }, views: [], emails: [] };
   await createPublished(db, kv, share, "admin@example.invalid");
   await Promise.all([recordView(db, kv, share, { at: new Date().toISOString(), country: "LK", ua: "a" }), recordView(db, kv, share, { at: new Date().toISOString(), country: "US", ua: "b" })]);
   const loaded = await loadPublished(db, kv, share.token);

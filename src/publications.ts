@@ -11,11 +11,12 @@ export interface ShareRecord {
   views: ShareView[];
   emails: ShareEmail[];
   viewCount?: number;
+  expiresAt?: string | null;
 }
 
 interface PublishedRow {
   token: string; proposal_id: string; name: string; prospect_name: string;
-  proposal_json: string; created_at: string;
+  proposal_json: string; created_at: string; expires_at: string | null;
 }
 interface EventRow {
   token: string; event_type: "view" | "email_accepted"; at: string;
@@ -25,13 +26,14 @@ interface CountRow { token: string; count: number }
 
 const fromRow = (row: PublishedRow): ShareRecord => ({
   token: row.token, proposalId: row.proposal_id, name: row.name, prospectName: row.prospect_name,
-  createdAt: row.created_at, updatedAt: row.created_at, proposal: JSON.parse(row.proposal_json), views: [], emails: [],
+  createdAt: row.created_at, updatedAt: row.created_at, proposal: JSON.parse(row.proposal_json), views: [], emails: [], expiresAt: row.expires_at,
 });
 
 export function shareSummary(s: ShareRecord) {
   return {
     token: s.token, proposalId: s.proposalId, name: s.name, prospectName: s.prospectName,
     createdAt: s.createdAt, updatedAt: s.updatedAt,
+    expiresAt: s.expiresAt || null,
     viewCount: s.viewCount ?? s.views.length,
     lastViewedAt: s.views.length ? s.views[0].at : null,
     recentViews: s.views.slice(0, 20), emails: s.emails.slice(0, 50),
@@ -40,16 +42,18 @@ export function shareSummary(s: ShareRecord) {
 
 export async function createPublished(db: D1Database | undefined, kv: KVNamespace, share: ShareRecord, actor: string) {
   if (!db) return kv.put(`share:${share.token}`, JSON.stringify(share));
-  await db.prepare('INSERT INTO published_proposals (token,proposal_id,name,prospect_name,proposal_json,created_by,created_at) VALUES (?,?,?,?,?,?,?)')
-    .bind(share.token, share.proposalId, share.name, share.prospectName, JSON.stringify(share.proposal), actor, share.createdAt).run();
+  await db.prepare('INSERT INTO published_proposals (token,proposal_id,name,prospect_name,proposal_json,created_by,created_at,expires_at) VALUES (?,?,?,?,?,?,?,?)')
+    .bind(share.token, share.proposalId, share.name, share.prospectName, JSON.stringify(share.proposal), actor, share.createdAt, share.expiresAt || null).run();
 }
 
 export async function loadPublished(db: D1Database | undefined, kv: KVNamespace, token: string): Promise<ShareRecord | null> {
   if (!db) {
     const raw = await kv.get(`share:${token}`);
-    return raw ? JSON.parse(raw) as ShareRecord : null;
+    if (!raw) return null;
+    const share = JSON.parse(raw) as ShareRecord;
+    return share.expiresAt && Date.parse(share.expiresAt) <= Date.now() ? null : share;
   }
-  const row = await db.prepare("SELECT token,proposal_id,name,prospect_name,proposal_json,created_at FROM published_proposals WHERE token=? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>?)")
+  const row = await db.prepare("SELECT token,proposal_id,name,prospect_name,proposal_json,created_at,expires_at FROM published_proposals WHERE token=? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>?)")
     .bind(token, new Date().toISOString()).first<PublishedRow>();
   if (!row) return null;
   const share = fromRow(row);
@@ -73,13 +77,16 @@ export async function listPublished(db: D1Database | undefined, kv: KVNamespace)
     let cursor: string | undefined;
     do {
       const page = await kv.list({ prefix: 'share:', cursor });
-      for (const key of page.keys) { const raw = await kv.get(key.name); if (raw) out.push(JSON.parse(raw) as ShareRecord); }
+      for (const key of page.keys) {
+        const raw = await kv.get(key.name);
+        if (raw) { const share = JSON.parse(raw) as ShareRecord; if (!share.expiresAt || Date.parse(share.expiresAt) > Date.now()) out.push(share); }
+      }
       cursor = page.list_complete ? undefined : page.cursor;
     } while (cursor);
     return out;
   }
   const [rows, events, counts] = await Promise.all([
-    db.prepare('SELECT token,proposal_id,name,prospect_name,proposal_json,created_at FROM published_proposals WHERE revoked_at IS NULL ORDER BY created_at DESC LIMIT 1000').all<PublishedRow>(),
+    db.prepare('SELECT token,proposal_id,name,prospect_name,proposal_json,created_at,expires_at FROM published_proposals WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at>?) ORDER BY created_at DESC LIMIT 1000').bind(new Date().toISOString()).all<PublishedRow>(),
     db.prepare("SELECT e.token,e.event_type,e.at,e.country,e.user_agent,e.recipient,e.subject FROM proposal_events e JOIN published_proposals p ON p.token=e.token WHERE p.revoked_at IS NULL ORDER BY e.at DESC LIMIT 5000").all<EventRow>(),
     db.prepare("SELECT e.token,COUNT(*) count FROM proposal_events e JOIN published_proposals p ON p.token=e.token WHERE p.revoked_at IS NULL AND e.event_type='view' GROUP BY e.token").all<CountRow>(),
   ]);
