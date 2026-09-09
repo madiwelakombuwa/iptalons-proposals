@@ -367,6 +367,11 @@ export default {
 
 
     // Public share page: /p/<token>
+    const publicShareAsset = url.pathname.match(/^\/p\/_assets\/(ip-components\.jsx|ip-screens\.jsx)$/);
+    if (publicShareAsset && (request.method === "GET" || request.method === "HEAD")) {
+      const assetUrl = new URL(`/${publicShareAsset[1]}`, url.origin);
+      return env.ASSETS.fetch(new Request(assetUrl, request));
+    }
     const shareMatch = url.pathname.match(/^\/p\/([a-z0-9]{10,40})$/);
     if (shareMatch && request.method === "GET") {
       return serveSharePage(request, env, ctx, shareMatch[1], authed);
