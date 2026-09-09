@@ -3,6 +3,7 @@ import { workspace } from "./workspace";
 import Anthropic from "@anthropic-ai/sdk";
 import { publicProposal, safeSourceUrl } from "./public-proposal";
 import { collectApifySignals, exportSignals, updateSignalState } from "./signals";
+import { createPublished, listPublished, loadPublished, recordEmail, recordView, revokePublished, shareSummary, type ShareEmail, type ShareRecord, type ShareView } from "./publications";
 
 interface Env extends WorkerBindings {
   ANTHROPIC_API_KEY?: string;
@@ -22,20 +23,6 @@ interface Env extends WorkerBindings {
 // The CSR Demand Radar (sister worker). /api/signals proxies it server-to-server
 // so the team never handles the radar password.
 const RADAR_ORIGIN = "https://iptalons-csr-radar.harsha-4cf.workers.dev";
-
-interface ShareView { at: string; country: string; ua: string }
-interface ShareEmail { at: string; to: string; subject: string }
-interface ShareRecord {
-  token: string;
-  proposalId: string;
-  name: string;
-  prospectName: string;
-  createdAt: string;
-  updatedAt: string;
-  proposal: Record<string, unknown>;
-  views: ShareView[];
-  emails: ShareEmail[];
-}
 
 const ALLOWED_MODELS = new Set([
   "claude-opus-4-7",
@@ -103,28 +90,6 @@ function newShareToken(): string {
   return [...bytes].map((b) => alphabet[b % alphabet.length]).join("");
 }
 
-function shareSummary(s: ShareRecord) {
-  return {
-    token: s.token,
-    proposalId: s.proposalId,
-    name: s.name,
-    prospectName: s.prospectName,
-    createdAt: s.createdAt,
-    updatedAt: s.updatedAt,
-    viewCount: s.views.length,
-    lastViewedAt: s.views.length ? s.views[0].at : null,
-    recentViews: s.views.slice(0, 20),
-    emails: s.emails,
-  };
-}
-
-async function loadShare(env: Env, token: string): Promise<ShareRecord | null> {
-  const raw = await env.SHARES.get(`share:${token}`);
-  return raw ? (JSON.parse(raw) as ShareRecord) : null;
-}
-
-const saveShare = (env: Env, s: ShareRecord) => env.SHARES.put(`share:${s.token}`, JSON.stringify(s));
-
 // ─── Daily digest ────────────────────────────────────────────────────────────
 interface RadarLead { t: string; tier: string; handle: string; src: string; pain: string; quote: string; url: string }
 interface RadarState { leads: Record<string, { status: string; owner: string; notes: string; updatedAt?: string }> }
@@ -184,14 +149,11 @@ async function buildDigest(env: Env, origin: string) {
 
 
   // ── Proposals & engagement (from share records) ──
-  const list = await env.SHARES.list({ prefix: "share:" });
+  const published = await listPublished(env.DB, env.SHARES);
   const sharesCreated: ShareRecord[] = [];
   const viewsToday: { share: ShareRecord; count: number; latest: ShareView }[] = [];
   const emailsToday: { share: ShareRecord; email: ShareEmail }[] = [];
-  for (const key of list.keys) {
-    const raw = await env.SHARES.get(key.name);
-    if (!raw) continue;
-    const s = JSON.parse(raw) as ShareRecord;
+  for (const s of published) {
     if (new Date(s.createdAt).getTime() >= cutoff) sharesCreated.push(s);
     const v = s.views.filter((x) => new Date(x.at).getTime() >= cutoff);
     if (v.length) viewsToday.push({ share: s, count: v.length, latest: v[0] });
@@ -487,29 +449,18 @@ export default {
         prospectName: String((publicProposal(proposal).prospect as { name: string }).name),
         createdAt: now, updatedAt: now, proposal: publicProposal(proposal), views: [], emails: [],
       };
-      await saveShare(env, share);
+      await createPublished(env.DB, env.SHARES, share, identity?.email || "legacy-workspace");
       return json({ ...shareSummary(share), url: `${url.origin}/p/${share.token}` });
     }
 
     if (url.pathname === "/api/shares" && request.method === "GET") {
-      const list = await env.SHARES.list({ prefix: "share:" });
-      const out = [];
-      for (const key of list.keys) {
-        const raw = await env.SHARES.get(key.name);
-        if (!raw) continue;
-        const s = JSON.parse(raw) as ShareRecord;
-        out.push({ ...shareSummary(s), url: `${url.origin}/p/${s.token}` });
-      }
+      const out = (await listPublished(env.DB, env.SHARES)).map(s => ({ ...shareSummary(s), url: `${url.origin}/p/${s.token}` }));
       return json({ shares: out });
     }
 
     const delMatch = url.pathname.match(/^\/api\/shares\/([a-z0-9]{10,40})$/);
     if (delMatch && request.method === "DELETE") {
-      const share = await loadShare(env, delMatch[1]);
-      if (share) {
-        await env.SHARES.delete(`share:${share.token}`);
-        // Legacy byprop indexes are no longer used for publication.
-      }
+      await revokePublished(env.DB, env.SHARES, delMatch[1]);
       return json({ ok: true });
     }
 
@@ -607,7 +558,7 @@ export default {
 
 // ─── Public share page with view logging ───────────────────────────────────
 async function serveSharePage(request: Request, env: Env, ctx: ExecutionContext, token: string, authed: boolean): Promise<Response> {
-  const share = await loadShare(env, token);
+  const share = await loadPublished(env.DB, env.SHARES, token);
   if (!share) {
     return new Response(
       "<!doctype html><meta charset=utf-8><title>Proposal not found</title><body style=\"font-family:system-ui;display:grid;place-items:center;height:100vh;margin:0;background:#F4F7EE;color:#1F2A1B\"><div style=\"text-align:center\"><div style=\"font-size:40px\">🍃</div><h1 style=\"font-size:20px\">This proposal link is no longer active</h1><p style=\"color:#5F6557\">Please contact IPTalons, Inc. at (972) 422-9169 for a fresh copy.</p></div>",
@@ -618,13 +569,12 @@ async function serveSharePage(request: Request, env: Env, ctx: ExecutionContext,
   const url = new URL(request.url);
   const isPreview = authed;
   if (!isPreview) {
-    share.views.unshift({
+    const view = {
       at: new Date().toISOString(),
       country: String((request as Request & { cf?: { country?: string } }).cf?.country || ""),
       ua: (request.headers.get("User-Agent") || "").slice(0, 140),
-    });
-    share.views = share.views.slice(0, MAX_VIEWS_KEPT);
-    ctx.waitUntil(saveShare(env, share));
+    };
+    ctx.waitUntil(recordView(env.DB, env.SHARES, share, view));
   }
 
   const assetResp = await env.ASSETS.fetch(new Request(new URL("/share.html", url.origin)));
@@ -639,7 +589,7 @@ async function handleSend(request: Request, env: Env, origin: string): Promise<R
   let body: { token?: string; to?: string; subject?: string; message?: string };
   try { body = await request.json(); } catch { return json({ error: "bad request" }, 400); }
 
-  const share = body.token ? await loadShare(env, body.token) : null;
+  const share = body.token ? await loadPublished(env.DB, env.SHARES, body.token) : null;
   if (!share) return json({ error: "share not found — create the share link first" }, 404);
   const to = String(body.to || "").trim();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return json({ error: "valid recipient email required" }, 400);
@@ -665,9 +615,7 @@ async function handleSend(request: Request, env: Env, origin: string): Promise<R
     return json({ error: `Email provider error (${sent.provider}): ${sent.detail}` }, 502);
   }
 
-  share.emails.unshift({ at: new Date().toISOString(), to, subject });
-  share.emails = share.emails.slice(0, 50);
-  await saveShare(env, share);
+  await recordEmail(env.DB, env.SHARES, share, { at: new Date().toISOString(), to, subject });
   return json({ ok: true, to, subject, provider: sent.provider });
 }
 

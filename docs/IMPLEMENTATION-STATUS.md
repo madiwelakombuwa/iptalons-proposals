@@ -51,3 +51,13 @@ Staging now uses a Cloudflare Access application scoped to the `iptalons-proposa
 D1 migrations create members, current workspace records, and immutable record revisions. Saves use optimistic revision checks, so stale browser tabs receive a conflict instead of overwriting newer work. The browser loads shared proposals and prospects, warns about unsaved changes, supports explicit saves and exports, and offers an administrator-only reviewed import that never overwrites an existing ID. A synthetic proposal was saved and reloaded through the live staging UI, then removed from both current records and version history.
 
 The protected staging URL is `https://iptalons-proposals-staging.skyabove.workers.dev`. AI, cron, and external recipient access remain disabled. Staging proposal links are protected by the same team Access policy and therefore must not be sent to customers yet.
+
+## Progress since the initial hardening pass
+
+- Added Allen, Adam, Harsha, and Keenen as individually allowlisted administrators in both Cloudflare Access and D1.
+- Replaced the managed Team text list with record-history-backed member and workspace performance cards.
+- Replaced the static Radar import in staging with a bounded Apify X collector, explainable qualification, stable source IDs, visible failures, and persistent review state. Staging stores 14 qualified results from the first 50-item run.
+- Moved new managed-workspace publications and engagement events to D1. Published proposal content is immutable; views and provider-accepted emails are append-only events; view totals are no longer capped; revocation retains the audit trail. The Worker keeps a KV compatibility path when no D1 binding exists.
+- Added an additive publication migration, concurrency/revocation regression coverage, and a verified staging database export at `/tmp/iptalons-staging-after-publications.sql` on the deployment host.
+
+The next recipient-delivery gate is routing: the current staging Access application protects `/p/*` recipient links. Configure and test a narrower public recipient route only after publication expiry, recipient-link policy, and end-to-end content review are agreed. Production resources and secrets remain unchanged.
