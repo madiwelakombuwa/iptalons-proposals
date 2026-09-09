@@ -14,7 +14,15 @@
   "kv_namespaces": [
     {
       "binding": "SHARES",
-      "id": "938f657a4f2e4f649fa844cb3ff10db8"
+      "id": "e31eb0ecfae34d069f729649b6ab3fd6"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "iptalons-proposals-production",
+      "database_id": "66fe06a6-f030-4581-a48d-9250b5d6964d",
+      "migrations_dir": "migrations"
     }
   ],
   "triggers": {
@@ -24,7 +32,10 @@
   },
   "vars": {
     "AI_ENABLED": "false",
-    "APP_ORIGIN": "https://iptalons-proposals.skyabove.workers.dev"
+    "APP_ORIGIN": "https://iptalons-proposals.skyabove.workers.dev",
+    "AUTH_MODE": "access",
+    "ACCESS_TEAM_DOMAIN": "lucky-moon-a847.cloudflareaccess.com",
+    "ACCESS_AUD": "8e55e722b5ca2bf0ccbe41b04ff5a74c5eab2a940d61ee2ee9697b416e996939"
   },
   "ratelimits": [
     {
@@ -46,9 +57,6 @@
   ],
   "observability": {
     "enabled": true
-  },
-  "secrets": {
-    "required": ["APIFY_API_TOKEN"]
   },
   "env": {
     "staging": {

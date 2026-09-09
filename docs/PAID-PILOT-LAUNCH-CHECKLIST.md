@@ -50,7 +50,9 @@
 - [x] Reserve `proposals.iptalons.com` as the eventual production hostname. Launch the first pilot on the Skyabove `workers.dev` origin; DNS cutover remains outstanding.
 - [ ] Complete the production inventory. Worker, bindings, secret names, and empty KV keyset are documented; browser-local record sets and published links still require export from every profile that used the legacy origin.
 - [ ] Provision isolated production D1/KV resources; do not reuse staging bindings.
-- [ ] Configure production Access applications and the narrow recipient route.
+- [x] Configure production Access for the four named administrators and a separate Everyone bypass limited to `/p/*`.
+- [x] Provision clean production D1 and KV resources, apply all migrations, and add the four administrators.
+- [x] Deploy the managed production Worker and verify anonymous rendering, exact view recording, revocation, and cleanup with a synthetic proposal.
 - [ ] Apply migrations, deploy the reviewed commit, and record the Worker version ID.
 - [ ] Run the release-gate acceptance suite with controlled data.
 - [ ] Test rollback without reverting database migrations.
