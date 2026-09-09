@@ -204,7 +204,7 @@ const TrustSecurity = ({ managed = false }) => (
     <p style={{ margin: '16px 0', lineHeight: 1.7 }}>This managed workspace helps the IPTalons team prepare and share proposals. Contact the workspace administrator for approved security documentation and data-handling requirements.</p>
     <Card style={{ padding: 24 }}>
       <h2>Sharing proposals</h2>
-      <p style={{ margin: '12px 0', lineHeight: 1.7 }}>Published links contain a snapshot of the proposal’s customer-facing content. {managed ? "Staging links also require an approved team sign-in; external recipient access is not enabled." : "Anyone with a link can read that snapshot."} Internal notes and activity records are excluded.</p>
+      <p style={{ margin: '12px 0', lineHeight: 1.7 }}>Published links contain a fixed snapshot of the proposal’s customer-facing content. Anyone with an active link can read that snapshot until it expires or is revoked. Internal notes and activity records are excluded.</p>
       <h2>Current limits</h2>
       <p style={{ margin: '12px 0', lineHeight: 1.7 }}>{managed ? "Saved records are shared in the workspace database. Unsaved changes stay in this tab: save or export them before leaving. Administrators can import backups after reviewing them." : "Working drafts currently remain in this browser. Export a backup before clearing browser data or changing computers."} Electronic signing is not connected.</p>
       <p style={{ lineHeight: 1.7 }}>Product certifications and restricted data residency require separately verified documentation. Do not upload regulated research records to this proposal workspace.</p>
@@ -225,6 +225,7 @@ const ShareModal = ({ managed = false, proposal, onClose, onShared, onProposalCh
     `Dear ${proposal.prospect?.contact || 'colleague'},\n\nThank you for your interest in strengthening ${proposal.prospect?.name || 'your institution'}'s research security program. Your proposal is ready for review at the link below.\n\nWe look forward to working together.\n\nAllen L. Phelps\nCEO, IPTalons, Inc.`);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState(null); // {tone:'ok'|'err'|'setup', text}
+  const [sendOperationId] = useState(() => crypto.randomUUID());
 
   const [publishing, setPublishing] = useState(false);
   const publish = async () => {
@@ -259,7 +260,7 @@ const ShareModal = ({ managed = false, proposal, onClose, onShared, onProposalCh
       const resp = await fetch('/api/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: share.token, to, subject, message }),
+        body: JSON.stringify({ token: share.token, to, subject, message, operationId: sendOperationId }),
       });
       const data = await resp.json();
       if (resp.status === 501) { setSendResult({ tone: 'setup', text: data.error }); }
@@ -290,7 +291,7 @@ const ShareModal = ({ managed = false, proposal, onClose, onShared, onProposalCh
           <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 16, cursor: 'pointer', color: COLORS.textSoft }}>✕</button>
         </div>
         <div style={{ fontSize: 12.5, color: COLORS.textSoft, marginBottom: 16, lineHeight: 1.6 }}>
-          Publish a fixed snapshot for {proposal.prospect?.contact || 'your prospect'}. {managed ? "Staging links require team sign-in and are not ready to send to customers." : "Anyone with the link can read it."} Later draft edits will not change this version. Page requests can include automated scanners.
+          Publish a fixed snapshot for {proposal.prospect?.contact || 'your prospect'}. Anyone with the active link can read it until it expires or is revoked. Later draft edits will not change this version. Page requests can include automated scanners.
         </div>
 
         {error && <div style={{ fontSize: 12.5, color: COLORS.red, background: COLORS.redBg, padding: '10px 14px', borderRadius: 8, marginBottom: 14 }}>⚠️ {error}{error.includes('unauthorized') ? ' (sign out and back in to refresh your session)' : ''}</div>}

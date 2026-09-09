@@ -1,5 +1,5 @@
 export interface ShareView { at: string; country: string; ua: string }
-export interface ShareEmail { at: string; to: string; subject: string }
+export interface ShareEmail { at: string; to: string; subject: string; operationId?: string }
 export interface ShareRecord {
   token: string;
   proposalId: string;
@@ -108,5 +108,5 @@ export async function recordView(db: D1Database | undefined, kv: KVNamespace, sh
 
 export async function recordEmail(db: D1Database | undefined, kv: KVNamespace, share: ShareRecord, email: ShareEmail) {
   if (!db) { share.emails.unshift(email); share.emails = share.emails.slice(0, 50); return kv.put(`share:${share.token}`, JSON.stringify(share)); }
-  await db.prepare("INSERT INTO proposal_events(token,event_type,at,recipient,subject) VALUES (?,'email_accepted',?,?,?)").bind(share.token, email.at, email.to, email.subject).run();
+  await db.prepare("INSERT OR IGNORE INTO proposal_events(token,event_type,at,recipient,subject,operation_id) VALUES (?,'email_accepted',?,?,?,?)").bind(share.token, email.at, email.to, email.subject, email.operationId || null).run();
 }

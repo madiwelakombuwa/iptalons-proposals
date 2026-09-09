@@ -299,10 +299,10 @@ async function buildDigest(env: Env, origin: string) {
   return { subject, html, text, seenHandles: radar ? leads.map(l => l.handle) : null, stats: { signals: leads.length, newSignals: newLeads.length, sharesCreated: sharesCreated.length, emailsToday: emailsToday.length, viewsToday: viewsToday.reduce((n, v) => n + v.count, 0), attention: attentionCount } };
 }
 
-async function sendViaResend(env: Env, to: string[], subject: string, html: string, text: string): Promise<Response> {
+async function sendViaResend(env: Env, to: string[], subject: string, html: string, text: string, idempotencyKey?: string): Promise<Response> {
   return fetch("https://api.resend.com/emails", {
     method: "POST",
-    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json", ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}) },
     body: JSON.stringify({ from: env.EMAIL_FROM || "IPTalons Proposals <onboarding@resend.dev>", to, subject, html, text }),
   });
 }
@@ -310,10 +310,13 @@ async function sendViaResend(env: Env, to: string[], subject: string, html: stri
 // Send through whichever channel is configured: Resend when the API key is
 // set, otherwise the Apps Script mailer (sends from the owner's Google
 // account; ~100 emails/day quota). Returns null if neither is configured.
-async function dispatchEmail(env: Env, to: string[], subject: string, html: string, text: string): Promise<{ ok: boolean; provider: string; detail: string } | null> {
+async function dispatchEmail(env: Env, to: string[], subject: string, html: string, text: string, idempotencyKey?: string): Promise<{ ok: boolean; provider: string; detail: string; providerId?: string } | null> {
   if (env.RESEND_API_KEY) {
-    const resp = await sendViaResend(env, to, subject, html, text);
-    return { ok: resp.ok, provider: "resend", detail: resp.ok ? "sent" : `${resp.status}: ${(await resp.text()).slice(0, 300)}` };
+    const resp = await sendViaResend(env, to, subject, html, text, idempotencyKey);
+    const responseText = await resp.text();
+    let providerId = "";
+    if (resp.ok) { try { providerId = String((JSON.parse(responseText) as { id?: string }).id || ""); } catch {} }
+    return { ok: resp.ok, provider: "resend", detail: resp.ok ? "accepted" : `${resp.status}: ${responseText.slice(0, 300)}`, providerId };
   }
   if (env.MAILER_URL && env.MAILER_SECRET) {
     const resp = await fetch(env.MAILER_URL, {
@@ -474,7 +477,7 @@ export default {
     }
 
     if (url.pathname === "/api/send" && request.method === "POST") {
-      return handleSend(request, env, url.origin);
+      return handleSend(request, env, url.origin, identity?.email || "legacy-workspace");
     }
 
     // ── Policy & market intel (news items matched to the pipeline) ────────
@@ -600,8 +603,8 @@ async function serveSharePage(request: Request, env: Env, ctx: ExecutionContext,
 }
 
 // ─── Email send (Resend if configured) ──────────────────────────────────────
-async function handleSend(request: Request, env: Env, origin: string): Promise<Response> {
-  let body: { token?: string; to?: string; subject?: string; message?: string };
+async function handleSend(request: Request, env: Env, origin: string, actor: string): Promise<Response> {
+  let body: { token?: string; to?: string; subject?: string; message?: string; operationId?: string };
   try { body = await request.json(); } catch { return json({ error: "bad request" }, 400); }
 
   const share = body.token ? await loadPublished(env.DB, env.SHARES, body.token) : null;
@@ -611,6 +614,24 @@ async function handleSend(request: Request, env: Env, origin: string): Promise<R
 
   const subject = String(body.subject || `Research Security Proposal — ${share.prospectName}`).slice(0, 200);
   const message = String(body.message || "").slice(0, 5000);
+  const operationId = String(body.operationId || "");
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/.test(operationId)) return json({ error: "valid email operationId required" }, 400);
+  const digest = await crypto.subtle.digest("SHA-256", enc.encode(JSON.stringify({ token: share.token, to, subject, message })));
+  const messageHash = [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+  const now = new Date().toISOString();
+
+  if (env.DB) {
+    const inserted = await env.DB.prepare("INSERT OR IGNORE INTO email_deliveries(operation_id,token,recipient,subject,message_hash,status,attempts,created_by,created_at,updated_at) VALUES(?,?,?,?,?,'pending',1,?,?,?)")
+      .bind(operationId, share.token, to, subject, messageHash, actor, now, now).run();
+    if (!Number(inserted.meta?.changes || 0)) {
+      const prior = await env.DB.prepare("SELECT token,recipient,subject,message_hash,status,provider,provider_id,error FROM email_deliveries WHERE operation_id=?")
+        .bind(operationId).first<{ token: string; recipient: string; subject: string; message_hash: string; status: string; provider: string; provider_id: string | null; error: string | null }>();
+      if (!prior || prior.token !== share.token || prior.recipient !== to || prior.subject !== subject || prior.message_hash !== messageHash)
+        return json({ error: "operationId was already used for different email content" }, 409);
+      if (prior.status === "accepted") return json({ ok: true, to, subject, provider: prior.provider, providerId: prior.provider_id, repeated: true });
+      return json({ error: prior.status === "pending" ? "This email operation is already in progress." : `This email operation previously failed: ${prior.error || "provider rejected it"}`, operationId }, 409);
+    }
+  }
   const shareUrl = `${origin}/p/${share.token}`;
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   const htmlBody = `<div style="font-family:Georgia,serif;max-width:560px;margin:0 auto;color:#1F2A1B;line-height:1.7">
@@ -619,19 +640,30 @@ async function handleSend(request: Request, env: Env, origin: string): Promise<R
     <p style="font-size:13px;color:#5F6557">IPTalons, Inc. · 6060 N. Central Expressway, Suite 500, Dallas, TX 75206 · (972) 422-9169</p>
   </div>`;
 
-  const sent = await dispatchEmail(env, [to], subject, htmlBody, `${message}\n\nView your proposal: ${shareUrl}`);
+  let sent: Awaited<ReturnType<typeof dispatchEmail>>;
+  try {
+    sent = await dispatchEmail(env, [to], subject, htmlBody, `${message}\n\nView your proposal: ${shareUrl}`, `proposal/${operationId}`);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message.slice(0, 300) : "Provider request failed";
+    if (env.DB) await env.DB.prepare("UPDATE email_deliveries SET status='failed',updated_at=?,error=? WHERE operation_id=? AND status='pending'").bind(new Date().toISOString(), detail, operationId).run();
+    return json({ error: "Email provider request failed. Check the delivery ledger before retrying.", operationId }, 502);
+  }
   if (!sent) {
+    if (env.DB) await env.DB.prepare("UPDATE email_deliveries SET status='failed',updated_at=?,error=? WHERE operation_id=? AND status='pending'").bind(new Date().toISOString(), "Resend is not configured", operationId).run();
     return json({
       error: "Email sending is not configured yet. Set the RESEND_API_KEY secret, or MAILER_URL + MAILER_SECRET for the Apps Script mailer — or use the copy-link / mail-app options.",
       needsSetup: true,
     }, 501);
   }
   if (!sent.ok) {
+    if (env.DB) await env.DB.prepare("UPDATE email_deliveries SET status='failed',updated_at=?,error=? WHERE operation_id=? AND status='pending'").bind(new Date().toISOString(), sent.detail, operationId).run();
     return json({ error: `Email provider error (${sent.provider}): ${sent.detail}` }, 502);
   }
 
-  await recordEmail(env.DB, env.SHARES, share, { at: new Date().toISOString(), to, subject });
-  return json({ ok: true, to, subject, provider: sent.provider });
+  const acceptedAt = new Date().toISOString();
+  if (env.DB) await env.DB.prepare("UPDATE email_deliveries SET status='accepted',provider=?,provider_id=?,updated_at=?,error=NULL WHERE operation_id=? AND status='pending'").bind(sent.provider, sent.providerId || null, acceptedAt, operationId).run();
+  await recordEmail(env.DB, env.SHARES, share, { at: acceptedAt, to, subject, operationId });
+  return json({ ok: true, to, subject, provider: sent.provider, providerId: sent.providerId || null });
 }
 
 // ─── Claude proxy (unchanged) ───────────────────────────────────────────────

@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
-import { createPublished, listPublished, loadPublished, recordView, revokePublished, type ShareRecord } from "../src/publications";
+import { createPublished, listPublished, loadPublished, recordEmail, recordView, revokePublished, type ShareRecord } from "../src/publications";
 
 function fixture() {
   const sql = new DatabaseSync(":memory:");
-  sql.exec("PRAGMA foreign_keys=ON;" + readFileSync("migrations/0002_publications.sql", "utf8"));
+  sql.exec("PRAGMA foreign_keys=ON;" + readFileSync("migrations/0002_publications.sql", "utf8") + readFileSync("migrations/0003_email_deliveries.sql", "utf8"));
   const db: any = { prepare(query: string) {
     let values: unknown[] = [];
     const statement = { bind(...args: unknown[]) { values = args; return statement; },
@@ -27,6 +27,10 @@ test("D1 publications keep immutable content, exact concurrent view counts and r
   const loaded = await loadPublished(db, kv, share.token);
   assert.equal(loaded?.viewCount, 2);
   assert.equal((await listPublished(db, kv))[0].viewCount, 2);
+  const email = { at: new Date().toISOString(), to: "recipient@example.invalid", subject: "Proposal", operationId: "email-op-123" };
+  await recordEmail(db, kv, share, email);
+  await recordEmail(db, kv, share, email);
+  assert.equal(sql.prepare("SELECT COUNT(*) count FROM proposal_events WHERE operation_id=?").get(email.operationId).count, 1);
   await revokePublished(db, kv, share.token);
   assert.equal(await loadPublished(db, kv, share.token), null);
   assert.equal((await listPublished(db, kv)).length, 0);
