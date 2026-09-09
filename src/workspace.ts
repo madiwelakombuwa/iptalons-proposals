@@ -6,14 +6,51 @@ const canonical = (value: unknown): string => {
   return JSON.stringify(value);
 };
 interface Row { id: string; record_json: string; revision: number; updated_by: string; updated_at: string }
+interface MemberRow { email: string; role: string }
+interface VersionRow { kind: string; id: string; revision: number; updated_by: string; updated_at: string }
 const present = (row: Row) => ({ record: JSON.parse(row.record_json), revision: row.revision, updatedBy: row.updated_by, updatedAt: row.updated_at });
 export async function workspace(request: Request, db: D1Database | undefined, identity: Identity | null): Promise<Response> {
   if (!identity) return json({ error: 'Individual workspace sign-in required' }, 401);
   if (!db) return json({ error: 'Workspace storage is not configured' }, 503);
   const url = new URL(request.url);
   if (url.pathname === '/api/workspace/members' && request.method === 'GET') {
-    const { results } = await db.prepare('SELECT email, role FROM workspace_members WHERE enabled = 1 ORDER BY email').all();
-    return json({ members: results });
+    const [memberRows, versionRows, recordRows] = await Promise.all([
+      db.prepare('SELECT email, role FROM workspace_members WHERE enabled = 1 ORDER BY email').all<MemberRow>(),
+      db.prepare('SELECT kind, id, revision, updated_by, updated_at FROM workspace_record_versions ORDER BY updated_at DESC').all<VersionRow>(),
+      db.prepare('SELECT kind, id, record_json, revision, updated_by, updated_at FROM workspace_records').all<Row & { kind: string }>(),
+    ]);
+    const creator = new Map(versionRows.results.filter(v => v.revision === 1).map(v => [`${v.kind}:${v.id}`, v.updated_by.toLowerCase()]));
+    const proposalValue = (record: Record<string, unknown>) => {
+      const items = Array.isArray(record.items) ? record.items as Record<string, unknown>[] : [];
+      return items.reduce((sum, item) => {
+        const price = Number(item.unitPrice) || 0, qty = Number(item.qty) || 0, discount = Number(item.bundleDiscount) || 0;
+        return sum + price * qty * (1 - Math.min(100, Math.max(0, discount)) / 100);
+      }, 0);
+    };
+    const members = memberRows.results.map(member => {
+      const email = member.email.toLowerCase();
+      const created = recordRows.results.filter(row => creator.get(`${row.kind}:${row.id}`) === email);
+      const prospects = created.filter(row => row.kind === 'prospect');
+      const proposals = created.filter(row => row.kind === 'proposal').map(row => ({ row, record: JSON.parse(row.record_json) as Record<string, unknown> }));
+      const activity = versionRows.results.filter(v => v.updated_by.toLowerCase() === email);
+      const sent = proposals.filter(({ record }) => ['sent','review','won','lost'].includes(String(record.status || '')));
+      const won = proposals.filter(({ record }) => record.status === 'won');
+      return {
+        email: member.email,
+        role: member.role,
+        metrics: {
+          prospectsCreated: prospects.length,
+          proposalsCreated: proposals.length,
+          proposalsSent: sent.length,
+          dealsClosed: won.length,
+          estimatedDealValue: proposals.filter(({ record }) => record.status !== 'lost').reduce((sum, { record }) => sum + proposalValue(record), 0),
+          closedValue: won.reduce((sum, { record }) => sum + proposalValue(record), 0),
+          activityCount: activity.length,
+          lastActiveAt: activity[0]?.updated_at || null,
+        },
+      };
+    });
+    return json({ members });
   }
   const match = url.pathname.match(/^\/api\/workspace\/records\/(proposal|prospect)(?:\/([^/]+))?$/);
   if (!match) return json({ error: 'Not found' }, 404);

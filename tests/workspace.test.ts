@@ -47,6 +47,23 @@ test('record pagination does not omit record 101', async () => {
   assert.equal(second.records.length,1); assert.equal(second.nextCursor,null); sql.close();
 });
 
+test('team summaries attribute created records and proposal value to the creator', async () => {
+  const { sql, db } = database();
+  sql.prepare('INSERT INTO workspace_members(email,role) VALUES (?,?)').run(admin.email,'admin');
+  const prospect = { id: 'prospect-1', name: 'Example University' };
+  const proposal = { id: 'proposal-1', status: 'won', items: [{ unitPrice: 1000, qty: 2, bundleDiscount: 10 }] };
+  assert.equal((await workspace(request(prospect.id, { record: prospect, expectedRevision: 0 }, 'prospect'), db, admin)).status, 200);
+  assert.equal((await workspace(request(proposal.id, { record: proposal, expectedRevision: 0 }), db, admin)).status, 200);
+  const response = await workspace(new Request('https://test.example/api/workspace/members'), db, admin);
+  const member = ((await response.json()) as any).members[0];
+  assert.deepEqual(member.metrics, {
+    prospectsCreated: 1, proposalsCreated: 1, proposalsSent: 1, dealsClosed: 1,
+    estimatedDealValue: 1800, closedValue: 1800, activityCount: 2, lastActiveAt: member.metrics.lastActiveAt,
+  });
+  assert(member.metrics.lastActiveAt);
+  sql.close();
+});
+
 test('Access verifies signature, issuer, audience, expiry and membership; revocation is immediate', async () => {
   const { sql, db } = database();
   sql.prepare('INSERT INTO workspace_members(email,role) VALUES (?,?)').run(admin.email,'admin');

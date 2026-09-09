@@ -710,7 +710,7 @@ const App = () => {
             {screen === 'services'  && <ServicesScreen />}
             {screen === 'templates' && <Templates />}
             {screen === 'reports'   && <Analytics proposals={proposals} />}
-            {screen === 'team' && (authMode === 'access' ? <ManagedTeam /> : <Team proposals={proposals} />)}
+            {screen === 'team' && (authMode === 'access' ? <ManagedTeam currentUser={auth.user} /> : <Team proposals={proposals} />)}
             {screen === 'trust'     && <TrustSecurity managed={authMode === 'access'} />}
             {screen === 'settings'  && <SettingsScreen managed={authMode === 'access'} exportShared={shared.exportEdits} />}
           </div>

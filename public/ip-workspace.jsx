@@ -95,8 +95,55 @@ function useSharedWorkspace({ mode, auth, proposals, prospects, setProposals, se
   return { ready, busy, dirty, controls, exportEdits };
 }
 
-function ManagedTeam() {
+function ManagedTeam({ currentUser }) {
   const [members, setMembers] = useState([]), [error, setError] = useState('');
   useEffect(() => { let active = true; fetch('/api/workspace/members').then(async r => { if (!r.ok) throw new Error('Unable to load team membership'); return r.json(); }).then(d => { if (active) setMembers(d.members); }).catch(e => { if (active) setError(e.message); }); return () => { active = false; }; }, []);
-  return <div style={{ padding: 32 }}><h1>Workspace team</h1><p>These are approved workspace members. Membership and access policies are managed by the administrator.</p>{error && <p role="alert">{error}</p>}{members.map(m => <p key={m.email}>{m.email} · {m.role}</p>)}</div>;
+  const money = value => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value || 0);
+  const nameOf = email => email.split('@')[0].split(/[._-]/).map(part => part.charAt(0).toUpperCase()+part.slice(1)).join(' ');
+  const initials = email => nameOf(email).split(' ').map(part => part[0]).join('').slice(0,2).toUpperCase();
+  const totals = members.reduce((sum, member) => {
+    for (const key of ['prospectsCreated','proposalsSent','dealsClosed','estimatedDealValue']) sum[key] += member.metrics?.[key] || 0;
+    return sum;
+  }, { prospectsCreated: 0, proposalsSent: 0, dealsClosed: 0, estimatedDealValue: 0 });
+  const relative = iso => {
+    if (!iso) return 'No recorded activity yet';
+    const days = Math.floor((Date.now()-new Date(iso).getTime())/86400000);
+    return days < 1 ? 'Active today' : days === 1 ? 'Active yesterday' : `Active ${days} days ago`;
+  };
+  const summary = [
+    ['Prospects created', totals.prospectsCreated, '#2F6B4F'],
+    ['Proposals sent', totals.proposalsSent, '#3F6FA3'],
+    ['Deals closed', totals.dealsClosed, '#7A963F'],
+    ['Estimated deal value', money(totals.estimatedDealValue), '#1F3B2C'],
+  ];
+  return <div style={{ padding: 32, maxWidth: 1180 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 20, marginBottom: 24 }}>
+      <div><h1 style={{ fontSize: 24, margin: 0, color: '#1F2A1B' }}>Workspace team</h1><p style={{ margin: '6px 0 0', color: '#687263', fontSize: 13 }}>Performance from shared workspace records, attributed to the member who created each record.</p></div>
+      <div style={{ fontSize: 12, color: '#687263', padding: '7px 11px', border: '1px solid #DDE3D5', borderRadius: 999, background: '#fff' }}>{members.length} active members</div>
+    </div>
+    {error && <div role="alert" style={{ marginBottom: 16, padding: 12, borderRadius: 8, background: '#F9EAE6', color: '#8F352B' }}>{error}</div>}
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, marginBottom: 26 }}>
+      {summary.map(([label,value,color]) => <div key={label} style={{ background: '#fff', border: '1px solid #E2E7DA', borderRadius: 12, padding: '17px 18px', boxShadow: '0 2px 8px rgba(31,42,27,.04)' }}>
+        <div style={{ color, fontSize: 26, fontWeight: 800, letterSpacing: '-.5px' }}>{value}</div><div style={{ color: '#778171', fontSize: 11.5, marginTop: 4 }}>{label}</div>
+      </div>)}
+    </div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(310px, 1fr))', gap: 16 }}>
+      {members.map((member, index) => {
+        const metric = member.metrics || {};
+        const palette = [['#E4EFDA','#416D2B'],['#E2EEF3','#31647A'],['#F4EAD8','#8B6426'],['#EAE5F3','#655082']][index % 4];
+        return <div key={member.email} style={{ background: '#fff', border: '1px solid #DEE4D6', borderRadius: 14, padding: 20, boxShadow: '0 3px 12px rgba(31,42,27,.055)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, display: 'grid', placeItems: 'center', background: palette[0], color: palette[1], fontWeight: 800 }}>{initials(member.email)}</div>
+            <div style={{ minWidth: 0, flex: 1 }}><div style={{ fontWeight: 700, color: '#1F2A1B' }}>{nameOf(member.email)} {member.email === currentUser && <span style={{ fontSize: 9, color: '#527A36', background: '#EDF4E8', padding: '2px 6px', borderRadius: 999 }}>YOU</span>}</div><div style={{ fontSize: 11.5, color: '#778171', overflow: 'hidden', textOverflow: 'ellipsis' }}>{member.email}</div></div>
+            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#527A36', background: '#EDF4E8', padding: '4px 8px', borderRadius: 999 }}>{member.role}</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderTop: '1px solid #EDF0E8', borderBottom: '1px solid #EDF0E8', padding: '13px 0', rowGap: 13 }}>
+            {[['Prospects',metric.prospectsCreated || 0],['Proposals sent',metric.proposalsSent || 0],['Deals closed',metric.dealsClosed || 0],['Est. value',money(metric.estimatedDealValue)]].map(([label,value]) => <div key={label}><div style={{ fontSize: 17, color: '#263421', fontWeight: 750 }}>{value}</div><div style={{ fontSize: 10.5, color: '#899283', marginTop: 2 }}>{label}</div></div>)}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 13, fontSize: 11, color: '#7C8577' }}><span>{relative(metric.lastActiveAt)}</span><span>{metric.activityCount || 0} saved changes</span></div>
+        </div>;
+      })}
+    </div>
+    <p style={{ marginTop: 18, fontSize: 11, lineHeight: 1.6, color: '#929A8D' }}>Metrics begin when records are saved in the shared workspace. Older imported records without creator history remain unassigned.</p>
+  </div>;
 }
