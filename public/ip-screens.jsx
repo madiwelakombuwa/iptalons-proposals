@@ -63,7 +63,7 @@ const LoginScreen = ({ onAuth, onDemo }) => {
           </div>
         </div>
         <div style={{ position: 'relative', zIndex: 1, fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>
-          SOC 2 Type II · ISO 27001 · FedRAMP Moderate (in process) · CMMC Level 2
+          Contact IPTalons for current security documentation and deployment requirements.
         </div>
       </div>
 
