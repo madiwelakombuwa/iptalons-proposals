@@ -46,9 +46,15 @@
   "observability": {
     "enabled": true
   },
+  "secrets": {
+    "required": ["APIFY_API_TOKEN"]
+  },
   "env": {
     "staging": {
       "name": "iptalons-proposals-staging",
+      "secrets": {
+        "required": ["APIFY_API_TOKEN"]
+      },
       "workers_dev": true,
       "preview_urls": false,
       "routes": [],

@@ -1772,7 +1772,7 @@ const RadarBadge = ({ size = 52 }) => {
   );
 };
 
-const Signals = ({ signals, syncedAt, onUpdate, onSync, onDraft }) => {
+const Signals = ({ signals, syncedAt, error, onUpdate, onSync, onDraft }) => {
   const [filter, setFilter] = useState('all');
   const [syncing, setSyncing] = useState(false);
 
@@ -1781,8 +1781,8 @@ const Signals = ({ signals, syncedAt, onUpdate, onSync, onDraft }) => {
 
   const syncNow = async () => {
     setSyncing(true);
-    await onSync();
-    setSyncing(false);
+    try { await onSync(); } catch {}
+    finally { setSyncing(false); }
   };
 
   return (
@@ -1793,7 +1793,7 @@ const Signals = ({ signals, syncedAt, onUpdate, onSync, onDraft }) => {
           <div>
             <h1 style={{ fontSize: 22, fontWeight: 700, color: COLORS.text, margin: 0 }}>Signals</h1>
             <p style={{ fontSize: 13, color: COLORS.textSoft, margin: '4px 0 0' }}>
-              The market asking for CSR — by name, in their own words. Auto-scanned daily from r/SBIR, r/NIH, LinkedIn and X.
+              Public X posts indicating research-security demand, collected through Apify and reviewed by your team.
             </p>
           </div>
         </div>
@@ -1802,6 +1802,8 @@ const Signals = ({ signals, syncedAt, onUpdate, onSync, onDraft }) => {
           <Btn variant="secondary" size="sm" onClick={syncNow} disabled={syncing}>{syncing ? 'Syncing…' : '↻ Sync now'}</Btn>
         </div>
       </div>
+
+      {error && <div role="alert" style={{ margin: '12px 0', padding: '10px 12px', borderRadius: 7, background: '#F9EAE6', color: '#8F352B', fontSize: 12.5 }}>{error}</div>}
 
       {/* Tier filter */}
       <div style={{ display: 'flex', gap: 7, margin: '18px 0 20px', flexWrap: 'wrap' }}>
@@ -1821,7 +1823,7 @@ const Signals = ({ signals, syncedAt, onUpdate, onSync, onDraft }) => {
           <div style={{ fontSize: 28, marginBottom: 8 }}>📡</div>
           <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text }}>No signals loaded yet</div>
           <div style={{ fontSize: 12.5, color: COLORS.textSoft, marginTop: 6 }}>
-            The radar syncs automatically after sign-in. If this persists, the Worker may be missing its <code>RADAR_PASSWORD</code> secret.
+            No qualified signals are stored yet. An administrator can run a bounded Apify scan with <strong>Sync now</strong>.
           </div>
         </Card>
       )}
@@ -1830,7 +1832,7 @@ const Signals = ({ signals, syncedAt, onUpdate, onSync, onDraft }) => {
         {shown.map(sig => {
           const st = sig.state || { status: 'new', owner: '', notes: '' };
           return (
-            <Card key={sig.handle} style={{ padding: 0, overflow: 'hidden' }}>
+            <Card key={sig.sourceId || sig.handle} style={{ padding: 0, overflow: 'hidden' }}>
               <div style={{ display: 'flex', gap: 0 }}>
                 {/* Signal content */}
                 <div style={{ flex: 1, padding: '16px 20px', minWidth: 0 }}>
@@ -1840,6 +1842,8 @@ const Signals = ({ signals, syncedAt, onUpdate, onSync, onDraft }) => {
                       background: sig.t === 'hot' ? '#F9EAE6' : sig.t === 'warm' ? '#FCF6E8' : '#E8F0DC' }}>{sig.tier}</span>
                     <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>{sig.handle}</span>
                     <span style={{ fontSize: 11, color: COLORS.textSoft }}>{sig.src}</span>
+                    {sig.score > 0 && <span title={(sig.scoreReasons || []).join(' · ')} style={{ fontSize: 10.5, color: COLORS.green, fontWeight: 700 }}>score {sig.score}</span>}
+                    {sig.publishedAt && <span style={{ fontSize: 10.5, color: COLORS.textGhost }}>{new Date(sig.publishedAt).toLocaleDateString()}</span>}
                     <a href={sig.url} target="_blank" rel="noopener" style={{ fontSize: 11, color: COLORS.blue, fontWeight: 600, textDecoration: 'none' }}>source ↗</a>
                   </div>
                   <div style={{ fontSize: 12.5, color: COLORS.text, lineHeight: 1.6, marginBottom: 6 }}>{stripHtml(sig.pain)}</div>
@@ -1849,15 +1853,15 @@ const Signals = ({ signals, syncedAt, onUpdate, onSync, onDraft }) => {
 
                 {/* Workflow rail */}
                 <div style={{ width: 210, flexShrink: 0, borderLeft: `1px solid ${COLORS.border}`, background: COLORS.bgAlt, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <select value={st.status} onChange={e => onUpdate(sig.handle, { status: e.target.value })}
+                  <select value={st.status} onChange={e => onUpdate(sig.sourceId || sig.handle, { status: e.target.value })}
                     style={{ padding: '6px 8px', fontSize: 12, fontWeight: 600, border: `1px solid ${COLORS.border}`, borderRadius: 7, background: '#fff', fontFamily: 'inherit', color: RADAR_STATUS_COLORS[st.status] || COLORS.text, cursor: 'pointer' }}>
                     {SIGNAL_STATUS_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                   </select>
                   <input defaultValue={st.owner} key={`o-${sig.handle}-${st.owner}`} placeholder="owner"
-                    onBlur={e => { if (e.target.value !== st.owner) onUpdate(sig.handle, { owner: e.target.value }); }}
+                    onBlur={e => { if (e.target.value !== st.owner) onUpdate(sig.sourceId || sig.handle, { owner: e.target.value }); }}
                     style={{ padding: '6px 8px', fontSize: 12, border: `1px solid ${COLORS.border}`, borderRadius: 7, fontFamily: 'inherit' }} />
                   <input defaultValue={st.notes} key={`n-${sig.handle}-${st.notes}`} placeholder="notes"
-                    onBlur={e => { if (e.target.value !== st.notes) onUpdate(sig.handle, { notes: e.target.value }); }}
+                    onBlur={e => { if (e.target.value !== st.notes) onUpdate(sig.sourceId || sig.handle, { notes: e.target.value }); }}
                     style={{ padding: '6px 8px', fontSize: 12, border: `1px solid ${COLORS.border}`, borderRadius: 7, fontFamily: 'inherit' }} />
                   <Btn size="sm" onClick={() => onDraft(sig)}>Draft proposal →</Btn>
                 </div>

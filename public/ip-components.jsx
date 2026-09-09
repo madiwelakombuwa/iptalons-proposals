@@ -217,6 +217,10 @@ const radarLeadToProspect = (lead, leadState) => ({
     owner: leadState?.owner || '',
     notes: leadState?.notes || '',
     importedAt: new Date().toISOString(),
+    sourceId: lead.sourceId || '',
+    publishedAt: lead.publishedAt || '',
+    score: lead.score || 0,
+    scoreReasons: lead.scoreReasons || [],
   },
 });
 

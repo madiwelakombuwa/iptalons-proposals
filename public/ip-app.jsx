@@ -280,19 +280,27 @@ const App = () => {
   // and the proposal pipeline are one system.
   const [signals, setSignals] = useState([]);
   const [signalsSyncedAt, setSignalsSyncedAt] = useState(null);
-  const loadSignals = useCallback(async () => {
+  const [signalsError, setSignalsError] = useState('');
+  const loadSignals = useCallback(async (runScan = false) => {
     try {
+      setSignalsError('');
+      if (runScan) {
+        const sync = await fetch('/api/signals/sync', { method: 'POST' });
+        const result = await sync.json().catch(() => ({}));
+        if (!sync.ok) throw new Error(result.error || `Signal scan failed (${sync.status})`);
+      }
       const resp = await fetch('/api/signals');
-      if (!resp.ok) return;
-      const data = await resp.json();
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data.error || `Signal load failed (${resp.status})`);
       const stMap = (data.state && data.state.leads) || {};
       setSignals((data.leads || []).filter(l => l.t !== 'comp').map(l => ({
         ...l,
-        state: stMap[l.handle] || { status: 'new', owner: '', notes: '' },
+        state: stMap[l.sourceId] || stMap[l.handle] || { status: 'new', owner: '', notes: '' },
       })));
-      setSignalsSyncedAt(new Date().toISOString());
+      setSignalsSyncedAt(data.meta?.scannedAt || null);
       if (authMode !== 'access') setProspects(prev => mergeRadarExport(prev, data).prospects);
-    } catch {}
+      return data;
+    } catch (error) { setSignalsError(error.message || 'Signal sync failed'); throw error; }
   }, [authMode]);
   useEffect(() => {
     if (!auth) return;
@@ -301,13 +309,13 @@ const App = () => {
     return () => clearInterval(t);
   }, [auth, loadSignals]);
 
-  const updateSignal = async (handle, patch) => {
-    setSignals(prev => prev.map(s => s.handle === handle ? { ...s, state: { ...s.state, ...patch } } : s));
+  const updateSignal = async (sourceId, patch) => {
+    setSignals(prev => prev.map(s => (s.sourceId || s.handle) === sourceId ? { ...s, state: { ...s.state, ...patch } } : s));
     try {
       const resp = await fetch('/api/signals/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ handle, patch }),
+        body: JSON.stringify({ sourceId, patch }),
       });
       if (!resp.ok) throw new Error('sync failed');
     } catch { loadSignals(); } // roll back to server truth
@@ -690,11 +698,12 @@ const App = () => {
                 share={shares[currentProp.id]} onShare={() => setShowShare(true)} />
             )}
             {screen === 'signals' && (
-              <Signals signals={displaySignals} syncedAt={signalsSyncedAt} onUpdate={updateSignal} onSync={loadSignals}
+              <Signals signals={displaySignals} syncedAt={signalsSyncedAt} error={signalsError} onUpdate={updateSignal} onSync={() => loadSignals(true)}
                 onDraft={(sig) => {
                   const pid = 'radar-' + String(sig.handle).toLowerCase().replace(/[^a-z0-9]+/g, '-');
-                  const p = prospects.find(x => x.id === pid);
-                  if (p) startNew(p);
+                  const p = prospects.find(x => x.id === pid) || radarLeadToProspect(sig, sig.state);
+                  if (!prospects.some(x => x.id === pid)) setProspects(prev => [p, ...prev]);
+                  startNew(p);
                 }} />
             )}
             {screen === 'prospects' && <Prospects prospects={prospects} onSync={loadSignals} syncedAt={signalsSyncedAt} news={displayNews} />}

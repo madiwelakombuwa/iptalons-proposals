@@ -2,6 +2,7 @@ import { identify } from "./identity";
 import { workspace } from "./workspace";
 import Anthropic from "@anthropic-ai/sdk";
 import { publicProposal, safeSourceUrl } from "./public-proposal";
+import { collectApifySignals, exportSignals, updateSignalState } from "./signals";
 
 interface Env extends WorkerBindings {
   ANTHROPIC_API_KEY?: string;
@@ -10,6 +11,7 @@ interface Env extends WorkerBindings {
   ACCESS_TEAM_DOMAIN?: string;
   ACCESS_AUD?: string;
   RADAR_PASSWORD?: string;
+  APIFY_API_TOKEN: string;
   RESEND_API_KEY?: string;
   EMAIL_FROM?: string;
   MAILER_URL?: string; // Apps Script mailer web app (send_email command)
@@ -153,6 +155,8 @@ const DIGEST_SEEN_KEY = "digest:seen";
 const DAY_MS = 24 * 3600 * 1000;
 
 async function fetchRadar(env: Env): Promise<{ leads: RadarLead[]; state: RadarState } | null> {
+  const local = await exportSignals(env.SHARES);
+  if (local.meta.scannedAt) return local;
   if (!env.RADAR_PASSWORD) return null;
   const resp = await fetch(`${RADAR_ORIGIN}/api/export`, {
     headers: { Authorization: `Bearer ${env.RADAR_PASSWORD}` },
@@ -443,28 +447,30 @@ export default {
 
     // ── Demand Radar signals (server-to-server proxy) ─────────────────────
     if (url.pathname === "/api/signals" && request.method === "GET") {
-      if (!env.RADAR_PASSWORD) {
-        return json({ error: "Radar sync is not configured — set the RADAR_PASSWORD secret on this Worker." }, 501);
+      return json(await exportSignals(env.SHARES));
+    }
+
+    if (url.pathname === "/api/signals/sync" && request.method === "POST") {
+      if (managed && identity?.role !== "admin") return json({ error: "Only workspace administrators may run a paid signal scan." }, 403);
+      if (!env.APIFY_API_TOKEN) return json({ error: "Apify collection is not configured." }, 501);
+      try {
+        const result = await collectApifySignals(env.SHARES, env.APIFY_API_TOKEN);
+        return json({ ok: true, scannedAt: result.scannedAt, candidates: result.candidateCount, qualified: result.leads.length });
+      } catch (error) {
+        console.error("signal sync failed", error);
+        return json({ error: error instanceof Error ? error.message : "Signal scan failed" }, 502);
       }
-      const resp = await fetch(`${RADAR_ORIGIN}/api/export`, {
-        headers: { Authorization: `Bearer ${env.RADAR_PASSWORD}` },
-      });
-      if (!resp.ok) return json({ error: `radar export failed (${resp.status})` }, 502);
-      return json(await resp.json());
     }
 
     if (url.pathname === "/api/signals/update" && request.method === "POST") {
-      if (!env.RADAR_PASSWORD) {
-        return json({ error: "Radar sync is not configured — set the RADAR_PASSWORD secret on this Worker." }, 501);
-      }
-      let body: { handle?: string; patch?: Record<string, string> };
+      let body: { sourceId?: string; handle?: string; patch?: Record<string, string> };
       try { body = await request.json(); } catch { return json({ error: "bad request" }, 400); }
-      const resp = await fetch(`${RADAR_ORIGIN}/api/lead`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${env.RADAR_PASSWORD}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ handle: body.handle, patch: body.patch }),
-      });
-      return json(await resp.json(), resp.status);
+      try {
+        const lead = await updateSignalState(env.SHARES, String(body.sourceId || body.handle || ""), body.patch || {});
+        return lead ? json({ ok: true, lead }) : json({ error: "signal not found" }, 404);
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : "bad request" }, 400);
+      }
     }
 
     if (url.pathname === "/api/shares" && request.method === "POST") {
@@ -587,6 +593,7 @@ export default {
   // Daily summary email — fires on the cron trigger in wrangler.jsonc.
   // No-ops (harmlessly) until RESEND_API_KEY and DIGEST_TO are configured.
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    if (env.APIFY_API_TOKEN) await collectApifySignals(env.SHARES, env.APIFY_API_TOKEN);
     const configured = env.RESEND_API_KEY || (env.MAILER_URL && env.MAILER_SECRET);
     if (!configured || !env.DIGEST_TO) return;
     const origin = "https://iptalons-proposals.skyabove.workers.dev";
