@@ -38,7 +38,7 @@
 ## Commercial and legal
 
 - [x] Pilot scope and price approved.
-- [ ] Identify the legal entity that licenses and supports the workspace.
+- [x] Identify the legal entity that licenses and supports the workspace: IPTalons, Inc.
 - [ ] Confirm invoice name, billing address, tax treatment, payment instructions, and invoice recipient.
 - [ ] Approve customer agreement, privacy terms, acceptable-use limits, support channel, retention, and termination/export terms.
 - [ ] Confirm ownership or authorization for the IPTalons brand, domain, source data, proposal content, and provider accounts.
@@ -48,7 +48,7 @@
 
 - [ ] Confirm the Cloudflare account that will permanently own production.
 - [ ] Confirm the production hostname and DNS control.
-- [ ] Inventory and back up every existing production Worker, KV namespace, D1 database, secret, browser-local record set, and published link that must survive.
+- [ ] Complete the production inventory. Worker, bindings, secret names, and empty KV keyset are documented; browser-local record sets and published links still require export from every profile that used the legacy origin.
 - [ ] Provision isolated production D1/KV resources; do not reuse staging bindings.
 - [ ] Configure production Access applications and the narrow recipient route.
 - [ ] Apply migrations, deploy the reviewed commit, and record the Worker version ID.
