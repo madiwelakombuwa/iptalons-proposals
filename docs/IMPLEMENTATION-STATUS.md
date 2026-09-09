@@ -38,8 +38,16 @@ The source changes above are an initial hardening increment, not a declaration t
 
 The CLI is authenticated as harsha@lookermetrics.com with access to the app’s existing Skyabove account (`aa96f50b9174b128d2cbe8f6db54b940`). Created an empty staging KV namespace (`a4d813d127874f569188f0c3d3daf77a`) and empty D1 database `iptalons-proposals-staging` (`e0d1b5d2-9651-4a59-90cb-3ea9db8afe71`). Cloudflare placed this test database in APAC; no production residency decision is implied.
 
-The `staging` environment binds these separate resources, disables cron, AI, workers.dev and preview URLs, and has no routes. The staging Worker is uploaded as version `9a73bf66-f32f-426a-8dfc-6a11db591489`, with no public targets or secrets configured. Existing production storage has not been modified or backed up in this step. D1 application tables, identity integration and shared-data APIs remain to be implemented.
+The `staging` environment binds these separate resources and disables cron and AI. Its `workers.dev` target is enabled behind Cloudflare Access for team testing. Existing production storage has not been modified or backed up in this step.
 
 The private GitHub repository has been published under madiwelakombuwa; its initial CI run passed.
 
 The user confirmed Skyabove as the hosting account for now. Staging remains isolated from the existing production KV namespace.
+
+## Individual access and shared records
+
+Staging now uses a Cloudflare Access application scoped to the `iptalons-proposals-staging` Worker. Its allow policy names `harsha@lookermetrics.com`, and the application session cookie is HTTP-only. The Worker independently validates Access JWT signature, issuer, audience, expiry, email, and subject before consulting its own membership table. `harsha@lookermetrics.com` is the initial administrator; additional people must be added to both the Access policy and the application membership table.
+
+D1 migrations create members, current workspace records, and immutable record revisions. Saves use optimistic revision checks, so stale browser tabs receive a conflict instead of overwriting newer work. The browser loads shared proposals and prospects, warns about unsaved changes, supports explicit saves and exports, and offers an administrator-only reviewed import that never overwrites an existing ID. A synthetic proposal was saved and reloaded through the live staging UI, then removed from both current records and version history.
+
+The protected staging URL is `https://iptalons-proposals-staging.skyabove.workers.dev`. AI, cron, and external recipient access remain disabled. Staging proposal links are protected by the same team Access policy and therefore must not be sent to customers yet.

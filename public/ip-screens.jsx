@@ -198,15 +198,15 @@ const SignatureModal = ({ onClose }) => (
 );
 
 // ─── Trust & Security page ────────────────────────────────────────────────
-const TrustSecurity = () => (
+const TrustSecurity = ({ managed = false }) => (
   <div style={{ padding: 36, maxWidth: 850 }}>
     <h1>Workspace security</h1>
     <p style={{ margin: '16px 0', lineHeight: 1.7 }}>This managed workspace helps the IPTalons team prepare and share proposals. Contact the workspace administrator for approved security documentation and data-handling requirements.</p>
     <Card style={{ padding: 24 }}>
       <h2>Sharing proposals</h2>
-      <p style={{ margin: '12px 0', lineHeight: 1.7 }}>Published links contain a snapshot of the proposal’s customer-facing content. Anyone with a link can read that snapshot. Internal notes and activity records are excluded.</p>
+      <p style={{ margin: '12px 0', lineHeight: 1.7 }}>Published links contain a snapshot of the proposal’s customer-facing content. {managed ? "Staging links also require an approved team sign-in; external recipient access is not enabled." : "Anyone with a link can read that snapshot."} Internal notes and activity records are excluded.</p>
       <h2>Current limits</h2>
-      <p style={{ margin: '12px 0', lineHeight: 1.7 }}>Working drafts currently remain in this browser. Export a backup before clearing browser data or changing computers. Electronic signing is not connected.</p>
+      <p style={{ margin: '12px 0', lineHeight: 1.7 }}>{managed ? "Saved records are shared in the workspace database. Unsaved changes stay in this tab: save or export them before leaving. Administrators can import backups after reviewing them." : "Working drafts currently remain in this browser. Export a backup before clearing browser data or changing computers."} Electronic signing is not connected.</p>
       <p style={{ lineHeight: 1.7 }}>Product certifications and restricted data residency require separately verified documentation. Do not upload regulated research records to this proposal workspace.</p>
     </Card>
   </div>
@@ -214,7 +214,7 @@ const TrustSecurity = () => (
 
 // ─── Dashboard ──────────────────────────────────────────────────────────────
 // ─── Share & Track modal (Phase 2: recipient link + view tracking + email) ──
-const ShareModal = ({ proposal, onClose, onShared, onProposalChange }) => {
+const ShareModal = ({ managed = false, proposal, onClose, onShared, onProposalChange }) => {
   const [share, setShare] = useState(null);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
@@ -290,7 +290,7 @@ const ShareModal = ({ proposal, onClose, onShared, onProposalChange }) => {
           <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 16, cursor: 'pointer', color: COLORS.textSoft }}>✕</button>
         </div>
         <div style={{ fontSize: 12.5, color: COLORS.textSoft, marginBottom: 16, lineHeight: 1.6 }}>
-          Publish a fixed snapshot for {proposal.prospect?.contact || 'your prospect'}. Anyone with the link can read it. Later draft edits will not change this version. Page requests can include automated scanners.
+          Publish a fixed snapshot for {proposal.prospect?.contact || 'your prospect'}. {managed ? "Staging links require team sign-in and are not ready to send to customers." : "Anyone with the link can read it."} Later draft edits will not change this version. Page requests can include automated scanners.
         </div>
 
         {error && <div style={{ fontSize: 12.5, color: COLORS.red, background: COLORS.redBg, padding: '10px 14px', borderRadius: 8, marginBottom: 14 }}>⚠️ {error}{error.includes('unauthorized') ? ' (sign out and back in to refresh your session)' : ''}</div>}
@@ -2073,7 +2073,7 @@ const MODEL_OPTIONS = [
   { value: 'claude-haiku-4-5',  label: 'Claude Haiku 4.5 — fastest' },
 ];
 
-const SettingsScreen = () => {
+const SettingsScreen = ({ managed = false, exportShared }) => {
   const exportBackup = () => {
     const backup = { version: 1, exportedAt: new Date().toISOString(), storage: {} };
     for (const key of ['ip_proposals_v2', 'ip_prospects_v1']) backup.storage[key] = localStorage.getItem(key);
@@ -2115,9 +2115,9 @@ const SettingsScreen = () => {
         <p style={{ fontSize: 13, color: COLORS.textSoft, margin: '4px 0 0' }}>Configure the Claude API used for proposal drafting.</p>
       </div>
       <Card style={{ padding: 24, marginBottom: 20 }}>
-        <h2>Browser data backup</h2>
-        <p>Export this browser’s proposal and prospect records before changing browsers or clearing site data. Keep the file private. This is a manual backup; team storage and restore tools are still pending.</p>
-        <Btn onClick={exportBackup}>Export backup</Btn>
+        <h2>{managed ? "Workspace backup" : "Browser data backup"}</h2>
+        <p>{managed ? "Export the loaded workspace records, including unsaved edits. Keep the file private. The import review in the toolbar adds new records and skips conflicts; it does not overwrite existing versions." : "Export this browser’s proposal and prospect records before changing browsers or clearing site data. Keep the file private."}</p>
+        <Btn onClick={managed ? exportShared : exportBackup}>Export backup</Btn>
       </Card>
       <Card style={{ padding: 24 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 4 }}>Claude API</div>

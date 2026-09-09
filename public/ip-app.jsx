@@ -213,20 +213,23 @@ const DemoOverlay = ({ step, playing, onPrev, onNext, onPlayPause, onExit }) => 
 const App = () => {
   // Auth state
   const [auth, setAuth] = useState(null);
+  const [authMode, setAuthMode] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
   useEffect(() => {
     let active = true;
     localStorage.removeItem('ip_api_key');
     fetch('/api/me').then(r => r.json()).then(data => {
       if (!active) return;
+      setAuthMode(data.mode || "legacy");
       if (data.authed) {
         let saved; try { saved = JSON.parse(localStorage.getItem('ip_authed') || 'null'); } catch {}
-        setAuth(saved || { user: 'team', name: 'IPTalons Team' });
+        setAuth(data.user || saved || { user: 'team', name: 'IPTalons Team' });
       } else localStorage.removeItem('ip_authed');
     }).catch(() => {}).finally(() => { if (active) setAuthChecked(true); });
     return () => { active = false; };
   }, []);
   const logout = () => {
+    if (authMode === 'access') { window.location.assign('/cdn-cgi/access/logout'); return; }
     localStorage.removeItem('ip_authed');
     fetch('/api/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {});
     setAuth(null);
@@ -258,6 +261,7 @@ const App = () => {
   const [demo, setDemo] = useState(null); // {step, playing} — Live Demo tour
 
   const persistRecords = (key, records) => {
+    if (authMode !== 'legacy') return;
     if (storageBlocked.current.has(key)) {
       setStorageError('Saved records could not be read. Original data has been preserved. Export a backup in Settings before continuing.');
       return;
@@ -265,8 +269,11 @@ const App = () => {
     try { localStorage.setItem(key, JSON.stringify(records)); }
     catch { setStorageError('Changes could not be saved in this browser. Keep this tab open and resolve browser storage before continuing.'); }
   };
-  useEffect(() => { persistRecords('ip_proposals_v2', proposals); }, [proposals]);
-  useEffect(() => { persistRecords('ip_prospects_v1', prospects); }, [prospects]);
+  useEffect(() => { persistRecords('ip_proposals_v2', proposals); }, [proposals, authMode]);
+  useEffect(() => { persistRecords('ip_prospects_v1', prospects); }, [prospects, authMode]);
+
+  const shared = useSharedWorkspace({ mode: authMode, auth, proposals, prospects, setProposals, setProspects,
+    clearEditor: () => { setCurrentProp(null); setScreen('dashboard'); } });
 
   // Demand Radar signals — auto-synced server-to-server (no password prompt).
   // Every sync silently merges leads into prospects (idempotent) so the radar
@@ -284,9 +291,9 @@ const App = () => {
         state: stMap[l.handle] || { status: 'new', owner: '', notes: '' },
       })));
       setSignalsSyncedAt(new Date().toISOString());
-      setProspects(prev => mergeRadarExport(prev, data).prospects);
+      if (authMode !== 'access') setProspects(prev => mergeRadarExport(prev, data).prospects);
     } catch {}
-  }, []);
+  }, [authMode]);
   useEffect(() => {
     if (!auth) return;
     loadSignals();
@@ -398,8 +405,11 @@ const App = () => {
   // Server session is authoritative; the local marker is only a display label.
   if (!authChecked) return <div style={{ padding: 32 }}>Checking workspace session…</div>;
   if (!auth) {
+    if (authMode === 'access') return <div style={{ padding: 32 }}><h1>IPTalons team sign-in</h1><p>A verified, approved Cloudflare Access identity is required. Contact your administrator if your email has not been enabled.</p><a href="/cdn-cgi/access/login">Sign in with Cloudflare Access</a></div>;
     return <LoginScreen onAuth={setAuth} />;
   }
+
+  if (authMode === 'access' && !shared.ready) return <div style={{ padding: 32 }}><h1>Loading workspace</h1>{shared.controls}</div>;
 
   // During the tour (not signed in) the live signal/news feeds 401 — show the demo snapshots
   const displaySignals = demo && signals.length === 0 ? DEMO_SIGNALS : signals;
@@ -578,10 +588,10 @@ const App = () => {
           <div onClick={() => setUserMenuOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 8, cursor: 'pointer', transition: 'background 0.12s', background: userMenuOpen ? 'rgba(255,255,255,0.1)' : 'transparent' }}
             onMouseEnter={e => { if (!userMenuOpen) e.currentTarget.style.background='rgba(255,255,255,0.07)'; }}
             onMouseLeave={e => { if (!userMenuOpen) e.currentTarget.style.background='transparent'; }}>
-            <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg, #7CB342, #558B2F)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0 }}>AP</div>
+            <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg, #7CB342, #558B2F)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{(auth.name || "IP").slice(0,2).toUpperCase()}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{auth?.name || 'Allen L. Phelps'}</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>CEO · Signed in</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>{auth.role || "Team"} · Signed in</div>
             </div>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="1.2" fill="rgba(255,255,255,0.3)"/><circle cx="7" cy="3.5" r="1.2" fill="rgba(255,255,255,0.3)"/><circle cx="7" cy="10.5" r="1.2" fill="rgba(255,255,255,0.3)"/></svg>
           </div>
@@ -660,8 +670,9 @@ const App = () => {
           </div>
         </div>
 
+        {shared.controls}
         {/* Screen content */}
-        <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
+        <div inert={shared.busy ? '' : undefined} style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
           <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
             {screen === 'dashboard' && <Dashboard proposals={proposals} prospects={prospects} news={displayNews} onOpen={openProposal} onNew={startNew} onUpdate={updateProposal}
               demoExpandIntel={demo ? Boolean(DEMO_STEPS[demo.step] && DEMO_STEPS[demo.step].intel) : false} />}
@@ -690,9 +701,9 @@ const App = () => {
             {screen === 'services'  && <ServicesScreen />}
             {screen === 'templates' && <Templates />}
             {screen === 'reports'   && <Analytics proposals={proposals} />}
-            {screen === 'team'      && <Team proposals={proposals} />}
-            {screen === 'trust'     && <TrustSecurity />}
-            {screen === 'settings'  && <SettingsScreen />}
+            {screen === 'team' && (authMode === 'access' ? <ManagedTeam /> : <Team proposals={proposals} />)}
+            {screen === 'trust'     && <TrustSecurity managed={authMode === 'access'} />}
+            {screen === 'settings'  && <SettingsScreen managed={authMode === 'access'} exportShared={shared.exportEdits} />}
           </div>
 
           {screen === 'editor' && aiOpen && (
@@ -706,7 +717,7 @@ const App = () => {
       {showPreview && currentProp && <ProposalPreview proposal={currentProp} onClose={() => setShowPreview(false)} onSendForSignature={() => { setShowPreview(false); setShowSignature(true); }} />}
       {showSignature && currentProp && <SignatureModal proposal={currentProp} onClose={() => setShowSignature(false)} onSend={handleSignatureSent} />}
       {showShare && currentProp && (
-        <ShareModal proposal={currentProp} onClose={() => { setShowShare(false); loadShares(); }}
+        <ShareModal managed={authMode === 'access'} proposal={currentProp} onClose={() => { setShowShare(false); loadShares(); }}
           onShared={(s) => setShares(prev => ({ ...prev, [s.proposalId]: s }))}
           onProposalChange={saveProposal} />
       )}

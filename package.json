@@ -12,13 +12,17 @@
     "deploy:check": "wrangler deploy --dry-run"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.40.1"
+    "@anthropic-ai/sdk": "^0.40.1",
+    "jose": "^6.2.12"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260908.1",
     "esbuild": "^0.28.2",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2",
-    "wrangler": "^4.129.1"
+    "wrangler": "^4.130.0"
+  },
+  "overrides": {
+    "sharp": "0.35.4"
   }
 }

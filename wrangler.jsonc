@@ -49,11 +49,14 @@
   "env": {
     "staging": {
       "name": "iptalons-proposals-staging",
-      "workers_dev": false,
+      "workers_dev": true,
       "preview_urls": false,
       "routes": [],
       "vars": {
-        "AI_ENABLED": "false"
+        "AI_ENABLED": "false",
+        "AUTH_MODE": "access",
+        "ACCESS_TEAM_DOMAIN": "lucky-moon-a847.cloudflareaccess.com",
+        "ACCESS_AUD": "0dd86f5da4a2c7820dad2ed97887863b2330fcf3678c635f12c2bbc9e2fd3c53"
       },
       "triggers": {
         "crons": []
@@ -68,7 +71,8 @@
         {
           "binding": "DB",
           "database_name": "iptalons-proposals-staging",
-          "database_id": "e0d1b5d2-9651-4a59-90cb-3ea9db8afe71"
+          "database_id": "e0d1b5d2-9651-4a59-90cb-3ea9db8afe71",
+          "migrations_dir": "migrations"
         }
       ],
       "ratelimits": [

@@ -1,9 +1,14 @@
+import { identify } from "./identity";
+import { workspace } from "./workspace";
 import Anthropic from "@anthropic-ai/sdk";
 import { publicProposal, safeSourceUrl } from "./public-proposal";
 
 interface Env extends WorkerBindings {
   ANTHROPIC_API_KEY?: string;
   APP_PASSWORD?: string;
+  AUTH_MODE?: string;
+  ACCESS_TEAM_DOMAIN?: string;
+  ACCESS_AUD?: string;
   RADAR_PASSWORD?: string;
   RESEND_API_KEY?: string;
   EMAIL_FROM?: string;
@@ -387,7 +392,13 @@ export default {
         request = new Request(request.url, { method: request.method, headers: request.headers, body: bytes });
       }
     }
-    const authed = await verifySession(env.APP_PASSWORD, getCookie(request, COOKIE));
+    const managed = env.AUTH_MODE === 'access';
+    const identity = managed ? await identify(request, env) : null;
+    const authed = managed ? Boolean(identity) : await verifySession(env.APP_PASSWORD, getCookie(request, COOKIE));
+    if (url.pathname.startsWith('/api/workspace/')) return workspace(request, env.DB, identity);
+    if (managed && url.pathname === '/api/login') return json({ error: 'Use individual Cloudflare Access sign-in' }, 403);
+    if (managed && url.pathname === '/api/logout') return json({ ok: true, redirect: '/cdn-cgi/access/logout' });
+
 
     // Public share page: /p/<token>
     const shareMatch = url.pathname.match(/^\/p\/([a-z0-9]{10,40})$/);
@@ -405,7 +416,7 @@ export default {
     }
 
     if (url.pathname === "/api/me" && request.method === "GET") {
-      return json({ authed, configured: Boolean(env.APP_PASSWORD) });
+      return json({ authed, configured: managed ? Boolean(env.ACCESS_TEAM_DOMAIN && env.ACCESS_AUD) : Boolean(env.APP_PASSWORD), mode: managed ? "access" : "legacy", user: identity ? { user: identity.email, name: identity.email, role: identity.role } : null });
     }
 
     if (url.pathname === "/api/login" && request.method === "POST") {
@@ -503,7 +514,7 @@ export default {
     // ── Policy & market intel (news items matched to the pipeline) ────────
     if (url.pathname === "/api/news" || url.pathname === "/api/news/ingest") {
       const bearer = (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-      const bearerOk = Boolean(env.APP_PASSWORD) && Boolean(bearer) && timingSafeEqual(bearer, env.APP_PASSWORD!);
+      const bearerOk = !managed && Boolean(env.APP_PASSWORD) && Boolean(bearer) && timingSafeEqual(bearer, env.APP_PASSWORD!);
       if (!authed && !bearerOk) return json({ error: "unauthorized" }, 401);
 
       if (url.pathname === "/api/news" && request.method === "GET") {
@@ -545,7 +556,7 @@ export default {
     // ── Daily digest (cookie session or Bearer APP_PASSWORD for scripts) ──
     if (url.pathname === "/api/digest" || url.pathname === "/api/digest/send") {
       const bearer = (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-      const bearerOk = Boolean(env.APP_PASSWORD) && Boolean(bearer) && timingSafeEqual(bearer, env.APP_PASSWORD!);
+      const bearerOk = !managed && Boolean(env.APP_PASSWORD) && Boolean(bearer) && timingSafeEqual(bearer, env.APP_PASSWORD!);
       if (!authed && !bearerOk) return json({ error: "unauthorized" }, 401);
 
       if (url.pathname === "/api/digest" && request.method === "GET") {

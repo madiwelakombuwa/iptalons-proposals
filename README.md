@@ -14,7 +14,7 @@ The UI currently loads React, Babel, and Chart.js from external CDNs. A producti
 
 `wrangler.jsonc` retains the existing Worker account and KV identifiers. Do not replace or migrate that storage without a verified backup. Staging has separate KV and D1 resources in the Skyabove account. Its Worker configuration disables public routes, preview URLs, cron and AI. Production has not been redeployed. The sibling Radar Worker has a separate configuration and requires its own review.
 
-AI defaults to disabled. Login and AI rate-limit bindings are configured; they are approximate per-location limits, not a global financial budget. Individual identities, durable usage accounting, and provider spending controls are required before paid access.
+AI defaults to disabled. Login and AI rate-limit bindings are configured; they are approximate per-location limits, not a global financial budget. Staging uses individual Cloudflare Access identities and revision-checked D1 records. Durable AI usage accounting and provider spending controls are still required before paid access.
 
 GitHub CI checks code but does not deploy. Production secrets belong in Cloudflare, never GitHub source. Existing exposed/shared credentials need operator rotation coordinated with existing integrations.
 
