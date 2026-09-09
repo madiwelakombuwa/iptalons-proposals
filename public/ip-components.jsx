@@ -968,7 +968,7 @@ Object.assign(window, {
   RADAR_URL, stripHtml, mergeRadarExport, DEMO_SIGNALS, DEMO_NEWS, demoMarketing, freshenFollowUps, newsMatchesProspect,
   CSR_JOURNEY_STEPS, CSR_PLATFORM_FEATURES, CSR_INCLUDED_TOOLS, CSR_TRUST_POINTS,
   fmt$, fmt$d, fmtDate, fmtDateLong, genId, calcItemTotal, calcProposalTotals,
-  daysUntil, fmtRelativeDate, followUpTone, dateOffset, freshenFollowUps, deriveNotifications,
+  daysUntil, fmtRelativeDate, followUpTone, dateOffset, deriveNotifications,
   Btn, Badge, Input, Select, Textarea, Card, Divider, IPTalonsLogo,
   ChartJS, CHART_FONT, baseScales, baseTooltip,
   useState, useEffect, useRef, useCallback, useMemo,

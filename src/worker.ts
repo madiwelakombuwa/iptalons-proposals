@@ -367,9 +367,10 @@ export default {
 
 
     // Public share page: /p/<token>
-    const publicShareAsset = url.pathname.match(/^\/p\/_assets\/(ip-components\.jsx|ip-screens\.jsx|logo\.webp)$/);
+    const publicShareAsset = url.pathname.match(/^\/p\/_assets\/(share\.js|logo\.webp)$/);
     if (publicShareAsset && (request.method === "GET" || request.method === "HEAD")) {
-      const assetUrl = new URL(`/${publicShareAsset[1]}`, url.origin);
+      const assetPath = publicShareAsset[1] === "share.js" ? "/assets/share.js" : `/${publicShareAsset[1]}`;
+      const assetUrl = new URL(assetPath, url.origin);
       return env.ASSETS.fetch(new Request(assetUrl, request));
     }
     const shareMatch = url.pathname.match(/^\/p\/([a-z0-9]{10,40})$/);
@@ -588,8 +589,14 @@ async function serveSharePage(request: Request, env: Env, ctx: ExecutionContext,
   const assetResp = await env.ASSETS.fetch(new Request(new URL("/share.html", url.origin)));
   let html = await assetResp.text();
   const payload = JSON.stringify({ token: share.token, proposal: publicProposal(share.proposal) }).replace(/</g, "\\u003c");
-  html = html.replace('"__SHARE_DATA__"', payload);
-  return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" } });
+  const nonceBytes = new Uint8Array(18); crypto.getRandomValues(nonceBytes);
+  const nonce = btoa(String.fromCharCode(...nonceBytes));
+  html = html.replace('"__SHARE_DATA__"', payload).replaceAll("__CSP_NONCE__", nonce);
+  return new Response(html, { headers: {
+    "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex",
+    "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": `default-src 'none'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'; form-action 'none'`,
+  } });
 }
 
 // ─── Email send (Resend if configured) ──────────────────────────────────────
