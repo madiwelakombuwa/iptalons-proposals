@@ -1,6 +1,6 @@
 # IPTalons Proposal Workspace — managed paid pilot
 
-**Status:** commercial draft for internal approval. This is product packaging, not a signed customer agreement or legal advice.
+**Status:** pilot scope and price approved by the product owner on 2026-09-10. Contracting entity, customer agreement, invoice details, and launch date remain open. This is product packaging, not a signed customer agreement or legal advice.
 
 ## The offer
 

@@ -226,13 +226,14 @@ const ShareModal = ({ managed = false, proposal, onClose, onShared, onProposalCh
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState(null); // {tone:'ok'|'err'|'setup', text}
   const [sendOperationId] = useState(() => crypto.randomUUID());
+  const [publishConfirmed, setPublishConfirmed] = useState(false);
 
   const [publishing, setPublishing] = useState(false);
   const publish = async () => {
     setPublishing(true); setError('');
     try {
       const resp = await fetch('/api/shares', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ proposal }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ proposal, reviewConfirmed: true }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || `Publish failed (${resp.status})`);
@@ -296,7 +297,13 @@ const ShareModal = ({ managed = false, proposal, onClose, onShared, onProposalCh
 
         {error && <div style={{ fontSize: 12.5, color: COLORS.red, background: COLORS.redBg, padding: '10px 14px', borderRadius: 8, marginBottom: 14 }}>⚠️ {error}{error.includes('unauthorized') ? ' (sign out and back in to refresh your session)' : ''}</div>}
 
-        {!share && <Btn onClick={publish} disabled={publishing}>{publishing ? 'Publishing…' : 'Publish proposal version'}</Btn>}
+        {!share && <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: 12, border: `1px solid ${COLORS.border}`, borderRadius: 9, background: COLORS.bgAlt, fontSize: 12, lineHeight: 1.5, color: COLORS.textMid }}>
+            <input type="checkbox" checked={publishConfirmed} onChange={e => setPublishConfirmed(e.target.checked)} style={{ marginTop: 3 }} />
+            <span>I reviewed the recipient, service scope, prices and discounts, claims, validity date, and payment terms. This version is approved for external sharing.</span>
+          </label>
+          <Btn onClick={publish} disabled={publishing || !publishConfirmed}>{publishing ? 'Publishing…' : 'Publish approved version'}</Btn>
+        </div>}
         {share && (
           <>
             {/* Link row */}

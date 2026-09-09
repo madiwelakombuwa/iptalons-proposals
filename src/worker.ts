@@ -445,9 +445,10 @@ export default {
     }
 
     if (url.pathname === "/api/shares" && request.method === "POST") {
-      let body: { proposal?: Record<string, unknown> };
+      let body: { proposal?: Record<string, unknown>; reviewConfirmed?: boolean };
       try { body = await request.json(); } catch { return json({ error: "bad request" }, 400); }
       const proposal = body?.proposal;
+      if (body.reviewConfirmed !== true) return json({ error: "Confirm the external proposal review before publishing." }, 400);
       const proposalId = String(proposal?.id || "");
       if (!proposal || typeof proposal !== "object" || Array.isArray(proposal) || !proposalId || proposalId.length > 128) return json({ error: "proposal with id required" }, 400);
 

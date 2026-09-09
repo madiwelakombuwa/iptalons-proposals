@@ -62,8 +62,9 @@ test('AI ignores browser credentials and caps provider output', async () => {
 test('new and legacy public shares exclude internal data; publication is immutable', async () => {
   const f = fixture(); const cookie = await f.login();
   const proposal = { id: 'same-id', name: 'Client A', prospect: { name: 'Client A', notes: 'PRIVATE-PROSPECT' }, internalNotes: 'PRIVATE-NOTE', activities: ['PRIVATE-ACTIVITY'], items: [{ serviceId: 'csr', qty: 10, unitPrice: 249, bundleDiscount: 0 }] };
-  const a = await (await f.call(req('/api/shares', { proposal }, cookie))).json() as any;
-  const b = await (await f.call(req('/api/shares', { proposal: { ...proposal, name: 'Client B' } }, cookie))).json() as any;
+  assert.equal((await f.call(req('/api/shares', { proposal }, cookie))).status, 400);
+  const a = await (await f.call(req('/api/shares', { proposal, reviewConfirmed: true }, cookie))).json() as any;
+  const b = await (await f.call(req('/api/shares', { proposal: { ...proposal, name: 'Client B' }, reviewConfirmed: true }, cookie))).json() as any;
   assert.notEqual(a.token, b.token);
   const stored = JSON.parse(await f.env.SHARES.get('share:'+a.token));
   assert.equal(stored.name, 'Client A'); assert(!JSON.stringify(stored).includes('PRIVATE-'));
