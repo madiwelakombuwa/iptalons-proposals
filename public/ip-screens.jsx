@@ -1448,7 +1448,7 @@ const ProposalPreview = ({ proposal, onClose, onSendForSignature, shareMode = fa
       {/* ─── PAGE 1: Cover ────────────────────────────────────────── */}
       <Page page="" noFooter>
         <div style={{ marginBottom: 32 }}>
-          <img src="/logo.webp" alt="IPTalons" style={{ height: 46, width: 'auto', display: 'block' }} />
+          <img src={shareMode ? "/p/_assets/logo.webp" : "/logo.webp"} alt="IPTalons" style={{ height: 46, width: 'auto', display: 'block' }} />
         </div>
 
         {/* Hero image placeholder — black/green gradient with hexagon pattern */}
