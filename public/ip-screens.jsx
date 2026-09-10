@@ -2172,6 +2172,7 @@ const SettingsScreen = ({ managed = false, exportShared }) => {
   const [resendKey, setResendKey] = useState('');
   const [resendFrom, setResendFrom] = useState('IPTalons Proposals <proposals@mail.iptalons.com>');
   const [resendConfigured, setResendConfigured] = useState(false);
+  const [resendStatus, setResendStatus] = useState({ kind: '', text: '' });
   useEffect(() => { if (managed) fetch('/api/settings/ai').then(r => r.json()).then(d => setConfigured(Boolean(d.configured))).catch(() => {}); }, [managed]);
   useEffect(() => { if (managed) fetch('/api/settings/email').then(r => r.json()).then(d => { setResendConfigured(Boolean(d.configured)); if (d.from) setResendFrom(d.from); }).catch(() => {}); }, [managed]);
 
@@ -2212,12 +2213,12 @@ const SettingsScreen = ({ managed = false, exportShared }) => {
   };
 
   const saveEmail = async () => {
-    if (!resendKey.trim()) { setStatus({ kind: 'err', text: 'Enter the Resend API key' }); return; }
+    if (!resendKey.trim()) { setResendStatus({ kind: 'err', text: 'Enter the Resend API key' }); return; }
     setBusy(true);
     const response = await fetch('/api/settings/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey: resendKey.trim(), from: resendFrom.trim() }) });
     const result = await response.json().catch(() => ({})); setBusy(false);
-    if (!response.ok) { setStatus({ kind: 'err', text: result.error || 'Unable to save Resend settings' }); return; }
-    setResendKey(''); setResendConfigured(true); setStatus({ kind: 'ok', text: 'Resend settings saved securely' });
+    if (!response.ok) { setResendStatus({ kind: 'err', text: result.error || 'Unable to save Resend settings' }); return; }
+    setResendKey(''); setResendConfigured(true); setResendStatus({ kind: 'ok', text: 'Resend settings saved securely' });
   };
 
   const removeEmail = async () => {
@@ -2225,11 +2226,20 @@ const SettingsScreen = ({ managed = false, exportShared }) => {
     setBusy(true);
     const response = await fetch('/api/settings/email', { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
     const result = await response.json().catch(() => ({})); setBusy(false);
-    if (!response.ok) { setStatus({ kind: 'err', text: result.error || 'Unable to remove Resend settings' }); return; }
-    setResendKey(''); setResendConfigured(false); setStatus({ kind: 'ok', text: 'Resend settings removed' });
+    if (!response.ok) { setResendStatus({ kind: 'err', text: result.error || 'Unable to remove Resend settings' }); return; }
+    setResendKey(''); setResendConfigured(false); setResendStatus({ kind: 'ok', text: 'Resend settings removed' });
+  };
+
+  const testEmail = async () => {
+    setBusy(true); setResendStatus({ kind: 'info', text: 'Sending test email…' });
+    const response = await fetch('/api/settings/email/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    const result = await response.json().catch(() => ({})); setBusy(false);
+    if (!response.ok) { setResendStatus({ kind: 'err', text: result.error || 'Test email failed' }); return; }
+    setResendStatus({ kind: 'ok', text: `Test accepted for ${result.to}${result.providerId ? ` · ${result.providerId}` : ''}` });
   };
 
   const statusColor = status.kind === 'ok' ? COLORS.green : status.kind === 'err' ? COLORS.red : COLORS.textSoft;
+  const resendStatusColor = resendStatus.kind === 'ok' ? COLORS.green : resendStatus.kind === 'err' ? COLORS.red : COLORS.textSoft;
 
   return (
     <div style={{ padding: 32, maxWidth: 720 }}>
@@ -2280,8 +2290,10 @@ const SettingsScreen = ({ managed = false, exportShared }) => {
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 24, alignItems: 'center', flexWrap: 'wrap' }}>
           <Btn onClick={saveEmail} disabled={busy}>Save Resend settings</Btn>
+          {resendConfigured && <Btn variant="secondary" onClick={testEmail} disabled={busy}>Send test to my email</Btn>}
           {resendConfigured && <Btn variant="secondary" onClick={removeEmail} disabled={busy}>Remove key</Btn>}
         </div>
+        {resendStatus.text && <div style={{ marginTop: 14, fontSize: 13, color: resendStatusColor }}>{resendStatus.text}</div>}
       </Card>}
     </div>
   );

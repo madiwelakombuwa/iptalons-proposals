@@ -480,6 +480,23 @@ export default {
       return json({ error: 'Method not allowed' }, 405);
     }
 
+    if (url.pathname === '/api/settings/email/test' && request.method === 'POST') {
+      if (!identity) return json({ error: 'Individual workspace sign-in required' }, 401);
+      if (identity.role !== 'admin') return json({ error: 'Only workspace administrators may test email delivery' }, 403);
+      let sent: Awaited<ReturnType<typeof dispatchEmail>>;
+      try {
+        const subject = 'IPTalons Proposals — email delivery test';
+        const text = `Email delivery is configured correctly for the IPTalons Proposals workspace.\n\nSent to ${identity.email} at ${new Date().toISOString()}.`;
+        const html = `<div style="font-family:system-ui,sans-serif;max-width:560px;margin:32px auto;color:#1F2A1B;line-height:1.6"><h1 style="font-size:22px">Email delivery is working</h1><p>The IPTalons Proposals workspace successfully sent this message through Resend.</p><p style="color:#6B7465;font-size:13px">Sent: ${new Date().toISOString()}</p></div>`;
+        sent = await dispatchEmail(env, [identity.email], subject, html, text, `settings-test/${crypto.randomUUID()}`);
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message.slice(0, 300) : 'Email provider request failed' }, 502);
+      }
+      if (!sent) return json({ error: 'Resend is not configured. Save the API key and sender first.' }, 501);
+      if (!sent.ok) return json({ error: `Resend rejected the test: ${sent.detail}` }, 502);
+      return json({ ok: true, to: identity.email, provider: sent.provider, providerId: sent.providerId || null });
+    }
+
     if (url.pathname === "/api/claude" && request.method === "POST") {
       if (!authed) return json({ error: "unauthorized — sign in to use AI" }, 401);
       if (env.AI_ENABLED !== "true") return json({ error: "AI drafting is disabled by the workspace administrator" }, 503);
