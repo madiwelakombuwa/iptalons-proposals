@@ -2060,14 +2060,18 @@ const Prospects = ({ prospects, onSync, syncedAt, news, onAdd, onUpdate, onDelet
   );
 };
 
-const ServicesScreen = () => (
+const ServicesScreen = () => {
+  const [services,setServices]=useState(Object.values(SERVICES)), revisions=useRef(new Map()), [error,setError]=useState('');
+  useEffect(()=>{fetch('/api/workspace/services').then(r=>r.json()).then(d=>{if(d.services){revisions.current=new Map(d.services.map(x=>[x.record.id,x.revision]));setServices(d.services.map(x=>x.record));Object.assign(SERVICES,Object.fromEntries(d.services.map(x=>[x.record.id,x.record])))}}).catch(e=>setError(e.message))},[]);
+  const edit=async s=>{const name=prompt('Service name',s?.name||'');if(!name)return;const record={...(s||{}),id:s?.id||crypto.randomUUID(),name,shortName:prompt('Short name',s?.shortName||name)||name,unit:prompt('Billing unit',s?.unit||'/year')||'/year',pricePerUnit:Number(prompt('Unit price',String(s?.pricePerUnit||0))),description:prompt('Description',s?.description||'')||''};const r=await fetch(`/api/workspace/services/${record.id}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({record,expectedRevision:revisions.current.get(record.id)||0})});const x=await r.json();if(!r.ok){setError(x.error);return}revisions.current.set(record.id,x.revision);setServices(a=>a.some(v=>v.id===record.id)?a.map(v=>v.id===record.id?record:v):[...a,record]);SERVICES[record.id]=record};
+  const remove=async s=>{if(!confirm(`Delete ${s.name}?`))return;const r=await fetch(`/api/workspace/services/${s.id}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedRevision:revisions.current.get(s.id)})});if(r.ok){setServices(a=>a.filter(v=>v.id!==s.id));delete SERVICES[s.id]}else setError((await r.json()).error)};
+  return (
   <div style={{ padding: 32 }}>
-    <div style={{ marginBottom: 28 }}>
+    <div style={{ marginBottom: 28,display:'flex',justifyContent:'space-between' }}><div>
       <h1 style={{ fontSize: 22, fontWeight: 700, color: COLORS.text, margin: 0 }}>Services Catalog</h1>
-      <p style={{ fontSize: 13, color: COLORS.textSoft, margin: '4px 0 0' }}>The four products that make up IPTalons' research security suite</p>
-    </div>
+      <p style={{ fontSize: 13, color: COLORS.textSoft, margin: '4px 0 0' }}>Shared products and authoritative default pricing</p></div><Btn icon="+" onClick={()=>edit(null)}>New Service</Btn></div>{error&&<div style={{color:COLORS.red}}>{error}</div>}
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
-      {Object.values(SERVICES).map(s => (
+      {services.map(s => (
         <Card key={s.id} style={{ padding: 20 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>{s.shortName}</div>
@@ -2079,11 +2083,13 @@ const ServicesScreen = () => (
               ✓ {s.bundleDiscount.percent}% bundle discount when paired with {SERVICES[s.bundleDiscount.with].shortName}
             </div>
           )}
+          <div style={{display:'flex',gap:8,marginTop:12}}><Btn size="sm" variant="secondary" onClick={()=>edit(s)}>Edit</Btn><Btn size="sm" variant="secondary" onClick={()=>edit({...s,id:crypto.randomUUID(),name:s.name+' Copy'})}>Duplicate</Btn><button onClick={()=>remove(s)} style={{border:0,background:'none',color:COLORS.red,cursor:'pointer'}}>Delete</button></div>
         </Card>
       ))}
     </div>
   </div>
-);
+  );
+};
 
 const Team = ({ proposals }) => {
   const ownership = SAMPLE_TEAM.map(t => {

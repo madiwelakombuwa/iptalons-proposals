@@ -78,6 +78,15 @@ export async function workspace(request: Request, db: D1Database | undefined, id
     }
     return json({ error: 'Method not allowed' }, 405);
   }
+  const serviceMatch = url.pathname.match(/^\/api\/workspace\/services(?:\/([^/]+))?$/);
+  if (serviceMatch) {
+    const id = serviceMatch[1] ? decodeURIComponent(serviceMatch[1]) : undefined;
+    if (request.method === 'GET' && !id) { const rows=await db.prepare('SELECT * FROM service_catalog ORDER BY rowid').all<Row>(); return json({services:rows.results.map(present)}); }
+    if(identity.role!=='admin') return json({error:'Only workspace administrators may change services'},403);
+    if(request.method==='POST'&&id){const body=await request.json() as any;if(!body.record||body.record.id!==id)return json({error:'Invalid service'},400);const data=canonical(body.record),now=new Date().toISOString();const row=body.expectedRevision?await db.prepare('UPDATE service_catalog SET record_json=?,revision=revision+1,updated_by=?,updated_at=? WHERE id=? AND revision=? RETURNING *').bind(data,identity.email,now,id,body.expectedRevision).first<Row>():await db.prepare('INSERT INTO service_catalog VALUES(?,?,1,?,?) ON CONFLICT(id) DO NOTHING RETURNING *').bind(id,data,identity.email,now).first<Row>();return row?json(present(row)):json({error:'Service changed or already exists'},409);}
+    if(request.method==='DELETE'&&id){const body=await request.json() as any;const row=await db.prepare('DELETE FROM service_catalog WHERE id=? AND revision=? RETURNING id').bind(id,body.expectedRevision).first();return row?json({deleted:true}):json({error:'Service changed or was deleted'},409);}
+    return json({error:'Method not allowed'},405);
+  }
   const match = url.pathname.match(/^\/api\/workspace\/records\/(proposal|prospect)(?:\/([^/]+))?$/);
   if (!match) return json({ error: 'Not found' }, 404);
   const kind = match[1];
