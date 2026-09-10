@@ -52,6 +52,32 @@ export async function workspace(request: Request, db: D1Database | undefined, id
     });
     return json({ members });
   }
+  const templateMatch = url.pathname.match(/^\/api\/workspace\/templates(?:\/([^/]+))?$/);
+  if (templateMatch) {
+    let id: string | undefined;
+    try { id = templateMatch[1] ? decodeURIComponent(templateMatch[1]) : undefined; } catch { return json({ error: 'Invalid ID' }, 400); }
+    if (request.method === 'GET' && !id) {
+      const rows = await db.prepare('SELECT * FROM proposal_templates ORDER BY rowid').all<Row>();
+      return json({ templates: rows.results.map(present) });
+    }
+    if (identity.role !== 'admin') return json({ error: 'Only workspace administrators may change templates' }, 403);
+    if (request.method === 'POST' && id) {
+      let body: { record?: Record<string, unknown>; expectedRevision?: number };
+      try { body = await request.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
+      if (!body.record || body.record.id !== id || !Number.isSafeInteger(body.expectedRevision) || body.expectedRevision! < 0) return json({ error: 'Invalid template record' }, 400);
+      const data = canonical(body.record), now = new Date().toISOString();
+      const result = body.expectedRevision === 0
+        ? await db.prepare('INSERT INTO proposal_templates VALUES(?,?,1,?,?) ON CONFLICT(id) DO NOTHING RETURNING *').bind(id,data,identity.email,now).first<Row>()
+        : await db.prepare('UPDATE proposal_templates SET record_json=?,revision=revision+1,updated_by=?,updated_at=? WHERE id=? AND revision=? RETURNING *').bind(data,identity.email,now,id,body.expectedRevision).first<Row>();
+      return result ? json(present(result)) : json({ error: 'Template changed or already exists. Reload and try again.' }, 409);
+    }
+    if (request.method === 'DELETE' && id) {
+      let body: { expectedRevision?: number }; try { body = await request.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
+      const deleted = await db.prepare('DELETE FROM proposal_templates WHERE id=? AND revision=? RETURNING id').bind(id,body.expectedRevision).first();
+      return deleted ? json({ deleted: true }) : json({ error: 'Template changed or was already deleted.' }, 409);
+    }
+    return json({ error: 'Method not allowed' }, 405);
+  }
   const match = url.pathname.match(/^\/api\/workspace\/records\/(proposal|prospect)(?:\/([^/]+))?$/);
   if (!match) return json({ error: 'Not found' }, 404);
   const kind = match[1];

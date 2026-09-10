@@ -976,12 +976,12 @@ const WizardStep1 = ({ data, prospects, onChange, onNext }) => {
 };
 
 // ─── Wizard Step 2: Service Mix & Tier ──────────────────────────────────────
-const WizardStep2 = ({ data, onChange, onBack, onNext }) => {
+const WizardStep2 = ({ data, templates = Object.values(PRICING_TIERS), onChange, onBack, onNext }) => {
   const [tier, setTier] = useState(data.tier || 'standard');
 
   const applyTier = (tierKey) => {
     setTier(tierKey);
-    const tierObj = PRICING_TIERS[tierKey];
+    const tierObj = templates.find(t => t.id === tierKey) || PRICING_TIERS[tierKey];
     // Auto-suggest researcher count from prospect, fall back to tier default
     const csrQty = data.prospect?.researcherCount || tierObj.items.find(i => i.serviceId === 'csr')?.qty || 100;
     const items = tierObj.items.map(it => {
@@ -995,6 +995,7 @@ const WizardStep2 = ({ data, onChange, onBack, onNext }) => {
       };
     });
     onChange('tier', tierKey);
+    onChange('templateName', tierObj.name);
     onChange('items', items);
   };
 
@@ -1013,7 +1014,7 @@ const WizardStep2 = ({ data, onChange, onBack, onNext }) => {
 
       {/* Tier picker */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
-        {Object.values(PRICING_TIERS).map(t => {
+        {templates.map(t => {
           const active = tier === t.id;
           return (
             <button key={t.id} type="button" onClick={() => applyTier(t.id)}
@@ -2132,14 +2133,35 @@ const Team = ({ proposals }) => {
   );
 };
 
-const Templates = () => (
+const TemplateEditor = ({ template, onClose, onSave }) => {
+  const blank = { id: crypto.randomUUID(), name: '', targetSize: '', description: '', items: [] };
+  const [form, setForm] = useState(() => template ? JSON.parse(JSON.stringify(template)) : blank);
+  const [error, setError] = useState(''), [saving, setSaving] = useState(false);
+  const qty = id => form.items.find(item => item.serviceId === id)?.qty || 0;
+  const setQty = (id, value) => setForm(f => ({ ...f, items: [...f.items.filter(item => item.serviceId !== id), ...(Number(value) > 0 ? [{ serviceId: id, qty: Number(value) }] : [])] }));
+  const submit = async e => { e.preventDefault(); if (!form.name.trim() || !form.items.length) { setError('Name and at least one service are required.'); return; } setSaving(true); try { await onSave({ ...form, name: form.name.trim(), targetSize: form.targetSize.trim(), description: form.description.trim() }); onClose(); } catch (x) { setError(x.message); } finally { setSaving(false); } };
+  return <div role="dialog" aria-modal="true" onClick={onClose} style={{ position:'fixed',inset:0,zIndex:1100,background:'rgba(31,42,27,.55)',display:'grid',placeItems:'center',padding:20 }}><form onSubmit={submit} onClick={e=>e.stopPropagation()} style={{ width:'min(680px,100%)',background:'#fff',borderRadius:14,padding:24,boxShadow:COLORS.shadowLg }}>
+    <h2 style={{ margin:'0 0 18px' }}>{template ? 'Edit template' : 'New template'}</h2>
+    <div style={{ display:'grid',gap:12 }}><Input label="Name" value={form.name} onChange={v=>setForm(f=>({...f,name:v}))} required/><Input label="Target size" value={form.targetSize} onChange={v=>setForm(f=>({...f,targetSize:v}))}/><Textarea label="Description" value={form.description} onChange={v=>setForm(f=>({...f,description:v}))} rows={2}/>
+      <div style={{ fontSize:12,fontWeight:700,color:COLORS.textMid }}>Default quantities</div><div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:10 }}>{Object.values(SERVICES).map(service=><Input key={service.id} label={service.shortName} type="number" value={qty(service.id)} onChange={v=>setQty(service.id,v)}/>)}</div>
+    </div>{error&&<div style={{ color:COLORS.red,fontSize:12,marginTop:10 }}>{error}</div>}<div style={{ display:'flex',justifyContent:'flex-end',gap:8,marginTop:20 }}><Btn type="button" variant="secondary" onClick={onClose}>Cancel</Btn><Btn type="submit" disabled={saving}>{saving?'Saving…':'Save template'}</Btn></div>
+  </form></div>;
+};
+
+const Templates = ({ templates = Object.values(PRICING_TIERS), onSave, onDelete, canEdit }) => {
+  const [editing,setEditing]=useState(null), [creating,setCreating]=useState(false), [error,setError]=useState('');
+  const duplicate = t => setEditing({ ...JSON.parse(JSON.stringify(t)), id: crypto.randomUUID(), name: `${t.name} Copy` });
+  return (
   <div style={{ padding: 32 }}>
-    <div style={{ marginBottom: 28 }}>
+    <div style={{ marginBottom: 28, display:'flex',justifyContent:'space-between',alignItems:'end' }}>
+      <div>
       <h1 style={{ fontSize: 22, fontWeight: 700, color: COLORS.text, margin: 0 }}>Proposal Templates</h1>
-      <p style={{ fontSize: 13, color: COLORS.textSoft, margin: '4px 0 0' }}>Pre-built tier bundles · click "New Proposal" to start from one</p>
+      <p style={{ fontSize: 13, color: COLORS.textSoft, margin: '4px 0 0' }}>Shared tier bundles used by the proposal wizard</p></div>
+      {canEdit&&<Btn icon="+" onClick={()=>setCreating(true)}>New Template</Btn>}
     </div>
+    {error&&<div role="alert" style={{ color:COLORS.red,marginBottom:12 }}>{error}</div>}
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-      {Object.values(PRICING_TIERS).map(t => (
+      {templates.map(t => (
         <Card key={t.id} style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text }}>{t.name}</div>
           <div style={{ fontSize: 11, color: COLORS.green, fontWeight: 600 }}>{t.targetSize}</div>
@@ -2147,11 +2169,14 @@ const Templates = () => (
           <div style={{ marginTop: 10, padding: 10, background: COLORS.bg, borderRadius: 6, fontSize: 11, color: COLORS.textMid }}>
             {t.items.map(it => `${SERVICES[it.serviceId].shortName} × ${it.qty}`).join(' · ')}
           </div>
+          {canEdit&&<div style={{ display:'flex',gap:8,marginTop:8 }}><Btn size="sm" variant="secondary" onClick={()=>setEditing(t)}>Edit</Btn><Btn size="sm" variant="secondary" onClick={()=>duplicate(t)}>Duplicate</Btn><button onClick={async()=>{if(confirm(`Delete ${t.name}?`))try{await onDelete(t.id)}catch(x){setError(x.message)}}} style={{border:0,background:'none',color:COLORS.red,cursor:'pointer'}}>Delete</button></div>}
         </Card>
       ))}
     </div>
+    {(creating||editing)&&<TemplateEditor template={editing} onClose={()=>{setCreating(false);setEditing(null)}} onSave={onSave}/>}
   </div>
-);
+  );
+};
 
 const Analytics = ({ proposals }) => {
   const total = proposals.reduce((sum, p) => sum + (calcProposalTotals(p).total || 0), 0);

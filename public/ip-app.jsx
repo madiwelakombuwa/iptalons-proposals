@@ -247,6 +247,8 @@ const App = () => {
   };
   const [proposals, setProposals] = useState(() => loadRecords('ip_proposals_v2'));
   const [prospects, setProspects] = useState(() => loadRecords('ip_prospects_v1'));
+  const [templates, setTemplates] = useState(() => Object.values(PRICING_TIERS));
+  const templateRevisions = useRef(new Map());
   const [currentProp, setCurrentProp] = useState(null);
   const [wizardData, setWizardData] = useState(null);
   const [wizardStep, setWizardStep] = useState(1);
@@ -274,6 +276,26 @@ const App = () => {
 
   const shared = useSharedWorkspace({ mode: authMode, auth, proposals, prospects, setProposals, setProspects,
     clearEditor: () => { setCurrentProp(null); setScreen('dashboard'); } });
+  useEffect(() => {
+    if (authMode !== 'access' || !auth) return;
+    fetch('/api/workspace/templates', { cache: 'no-store' }).then(r => r.json()).then(data => {
+      if (!Array.isArray(data.templates)) return;
+      templateRevisions.current = new Map(data.templates.map(row => [row.record.id, row.revision]));
+      setTemplates(data.templates.map(row => row.record));
+    }).catch(() => {});
+  }, [authMode, auth?.user]);
+  const saveTemplate = async record => {
+    const expectedRevision = templateRevisions.current.get(record.id) || 0;
+    const response = await fetch(`/api/workspace/templates/${encodeURIComponent(record.id)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ record, expectedRevision }) });
+    const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Template save failed');
+    templateRevisions.current.set(record.id, result.revision);
+    setTemplates(rows => rows.some(row => row.id === record.id) ? rows.map(row => row.id === record.id ? record : row) : [...rows, record]);
+  };
+  const deleteTemplate = async id => {
+    const response = await fetch(`/api/workspace/templates/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedRevision: templateRevisions.current.get(id) }) });
+    const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Template delete failed');
+    templateRevisions.current.delete(id); setTemplates(rows => rows.filter(row => row.id !== id));
+  };
 
   // Demand Radar signals — auto-synced server-to-server (no password prompt).
   // Every sync silently merges leads into prospects (idempotent) so the radar
@@ -690,7 +712,7 @@ const App = () => {
               <WizardStep1 data={wizardData} prospects={prospects} onChange={(k, v) => setWizardData(d => ({ ...d, [k]: v }))} onNext={() => setWizardStep(2)} />
             )}
             {screen === 'wizard' && wizardStep === 2 && (
-              <WizardStep2 data={wizardData} onChange={(k, v) => setWizardData(d => ({ ...d, [k]: v }))} onBack={() => setWizardStep(1)} onNext={() => setWizardStep(3)} />
+              <WizardStep2 data={wizardData} templates={templates} onChange={(k, v) => setWizardData(d => ({ ...d, [k]: v }))} onBack={() => setWizardStep(1)} onNext={() => setWizardStep(3)} />
             )}
             {screen === 'wizard' && wizardStep === 3 && (
               <WizardStep3 data={wizardData} onChange={(k, v) => setWizardData(d => ({ ...d, [k]: v }))} onBack={() => setWizardStep(2)} onDone={() => { saveProposal(wizardData); setCurrentProp(wizardData); setScreen('editor'); }} />
@@ -713,7 +735,7 @@ const App = () => {
                 onUpdate={prospect => authMode === 'access' ? shared.upsertRecord('prospect', prospect) : setProspects(prev => prev.map(row => row.id === prospect.id ? prospect : row))}
                 onDelete={id => authMode === 'access' ? shared.deleteRecord('prospect', id) : setProspects(prev => prev.filter(row => row.id !== id))} />}
             {screen === 'services'  && <ServicesScreen />}
-            {screen === 'templates' && <Templates />}
+            {screen === 'templates' && <Templates templates={templates} onSave={saveTemplate} onDelete={deleteTemplate} canEdit={authMode === 'access' && auth.role === 'admin'} />}
             {screen === 'reports'   && <Analytics proposals={proposals} />}
             {screen === 'team' && (authMode === 'access' ? <ManagedTeam currentUser={auth.user} /> : <Team proposals={proposals} />)}
             {screen === 'trust'     && <TrustSecurity managed={authMode === 'access'} />}
