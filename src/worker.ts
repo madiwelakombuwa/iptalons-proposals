@@ -429,7 +429,9 @@ export default {
       if (!env.DB || !env.SETTINGS_ENCRYPTION_KEY) return json({ error: 'Encrypted settings storage is not configured' }, 503);
       if (request.method === 'GET') {
         const row = await env.DB.prepare("SELECT updated_by,updated_at FROM workspace_settings WHERE key='anthropic_api_key'").first<{ updated_by: string; updated_at: string }>();
-        return json({ configured: Boolean(row), updatedBy: row?.updated_by || null, updatedAt: row?.updated_at || null });
+        const month = new Date().toISOString().slice(0,7);
+        const usage = await env.DB.prepare("SELECT COUNT(*) AS requests,COALESCE(SUM(input_tokens),0) AS inputTokens,COALESCE(SUM(output_tokens),0) AS outputTokens FROM ai_usage_events WHERE created_at >= ?").bind(`${month}-01T00:00:00.000Z`).first<{ requests: number; inputTokens: number; outputTokens: number }>();
+        return json({ configured: Boolean(row), updatedBy: row?.updated_by || null, updatedAt: row?.updated_at || null, usage: usage || { requests: 0, inputTokens: 0, outputTokens: 0 } });
       }
       if (request.method === 'POST') {
         let body: { apiKey?: string }; try { body = await request.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
@@ -503,7 +505,7 @@ export default {
       if (!env.AI_RATE_LIMIT) return json({ error: "AI rate limit is not configured" }, 503);
       if (!(await env.AI_RATE_LIMIT.limit({ key: "iptalons-workspace" })).success)
         return json({ error: "Workspace AI request limit reached. Retry shortly." }, 429, { "Retry-After": "60" });
-      return handleClaudeRequest(request, env);
+      return handleClaudeRequest(request, env, identity?.email || 'legacy-workspace');
     }
 
     if (url.pathname === "/api/me" && request.method === "GET") {
@@ -784,7 +786,7 @@ async function handleSend(request: Request, env: Env, origin: string, actor: str
 }
 
 // ─── Claude proxy (unchanged) ───────────────────────────────────────────────
-async function handleClaudeRequest(request: Request, env: Env): Promise<Response> {
+async function handleClaudeRequest(request: Request, env: Env, actorEmail: string): Promise<Response> {
   let body: {
     messages?: Anthropic.MessageParam[];
     model?: string;
@@ -828,6 +830,10 @@ async function handleClaudeRequest(request: Request, env: Env): Promise<Response
       system: body.system,
       messages: body.messages,
     });
+    if (env.DB) {
+      await env.DB.prepare('INSERT INTO ai_usage_events(id,actor_email,model,input_tokens,output_tokens,created_at) VALUES(?,?,?,?,?,?)')
+        .bind(crypto.randomUUID(), actorEmail, response.model || model, response.usage?.input_tokens || 0, response.usage?.output_tokens || 0, new Date().toISOString()).run();
+    }
 
     const text = response.content
       .filter((b): b is Anthropic.TextBlock => b.type === "text")

@@ -69,6 +69,10 @@ The protected staging URL is `https://iptalons-proposals-staging.skyabove.worker
 - Replaced the static Radar import in staging with a bounded Apify X collector, explainable qualification, stable source IDs, visible failures, and persistent review state. Staging stores 14 qualified results from the first 50-item run.
 - Moved new managed-workspace publications and engagement events to D1. Published proposal content is immutable; views and provider-accepted emails are append-only events; view totals are no longer capped; revocation retains the audit trail. The Worker keeps a KV compatibility path when no D1 binding exists.
 - Added an additive publication migration, concurrency/revocation regression coverage, and a verified staging database export at `/tmp/iptalons-staging-after-publications.sql` on the deployment host.
+- Prospect create, edit, and delete operations now commit to D1 immediately and surface failures before closing the editor. Proposal edits use debounced revision-checked D1 saves with visible saving/saved status and the existing unload guard.
+- Frontend deployments now use content-hashed bundle filenames, preventing browsers from retaining an old application implementation after a release.
+- Workspace administrators can store Claude and Resend credentials through write-only encrypted settings. Resend includes a self-test restricted to the signed-in administrator's Access email.
+- Successful Claude calls are recorded in an append-only D1 usage ledger, and Settings reports the current month's request and token totals.
 
 The staging recipient-delivery gate is now open at `/p/*` through a path-specific Cloudflare Access bypass. The workspace root and private APIs remain behind the named-user Access application. A synthetic proposal rendered anonymously end to end, loaded its first-party assets, and recorded exact D1 view events; the test record and events were then removed.
 

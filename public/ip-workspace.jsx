@@ -5,6 +5,7 @@ function useSharedWorkspace({ mode, auth, proposals, prospects, setProposals, se
   const [message, setMessage] = useState(''), [review, setReview] = useState(null);
   const [generation, setGeneration] = useState(0);
   const bases = useRef({ proposal: new Map(), prospect: new Map() });
+  const saveTimers = useRef(new Map()), saveChains = useRef(new Map()), latestRecords = useRef(new Map());
   const enabled = mode === 'access';
   const entries = { proposal: proposals, prospect: prospects };
   const dirty = enabled && ready && Object.entries(entries).some(([kind, rows]) => {
@@ -102,6 +103,21 @@ function useSharedWorkspace({ mode, auth, proposals, prospects, setProposals, se
       setMessage(error.message); throw error;
     } finally { setBusy(false); }
   };
+  const scheduleRecord = (kind, record, delay = 700) => {
+    if (!enabled || !ready) return;
+    const key = `${kind}:${record.id}`;
+    latestRecords.current.set(key, record);
+    clearTimeout(saveTimers.current.get(key));
+    setMessage(`Saving ${kind}…`);
+    saveTimers.current.set(key, setTimeout(() => {
+      const chain = (saveChains.current.get(key) || Promise.resolve()).catch(() => {}).then(async () => {
+        const latest = latestRecords.current.get(key);
+        if (latest) await upsertRecord(kind, latest);
+      });
+      saveChains.current.set(key, chain);
+    }, delay));
+  };
+  useEffect(() => () => { for (const timer of saveTimers.current.values()) clearTimeout(timer); }, []);
   const prepareImport = backup => {
     try {
       const p = JSON.parse(backup.storage?.ip_proposals_v2 || '[]'), c = JSON.parse(backup.storage?.ip_prospects_v1 || '[]');
@@ -139,7 +155,7 @@ function useSharedWorkspace({ mode, auth, proposals, prospects, setProposals, se
       <button disabled={busy || dirty} onClick={importRecords}>Import reviewed records</button><button disabled={busy} onClick={() => setReview(null)}>Cancel</button>
     </div>}
   </div>;
-  return { ready, busy, dirty, controls, exportEdits, upsertRecord, deleteRecord };
+  return { ready, busy, dirty, controls, exportEdits, upsertRecord, deleteRecord, scheduleRecord };
 }
 
 function ManagedTeam({ currentUser }) {

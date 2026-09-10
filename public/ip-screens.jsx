@@ -2176,11 +2176,12 @@ const SettingsScreen = ({ managed = false, exportShared }) => {
   const [busy, setBusy] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [configured, setConfigured] = useState(false);
+  const [aiUsage, setAiUsage] = useState(null);
   const [resendKey, setResendKey] = useState('');
   const [resendFrom, setResendFrom] = useState('IPTalons Proposals <proposals@mail.iptalons.com>');
   const [resendConfigured, setResendConfigured] = useState(false);
   const [resendStatus, setResendStatus] = useState({ kind: '', text: '' });
-  useEffect(() => { if (managed) fetch('/api/settings/ai').then(r => r.json()).then(d => setConfigured(Boolean(d.configured))).catch(() => {}); }, [managed]);
+  useEffect(() => { if (managed) fetch('/api/settings/ai').then(r => r.json()).then(d => { setConfigured(Boolean(d.configured)); setAiUsage(d.usage || null); }).catch(() => {}); }, [managed]);
   useEffect(() => { if (managed) fetch('/api/settings/email').then(r => r.json()).then(d => { setResendConfigured(Boolean(d.configured)); if (d.from) setResendFrom(d.from); }).catch(() => {}); }, [managed]);
 
   const save = async () => {
@@ -2278,6 +2279,7 @@ const SettingsScreen = ({ managed = false, exportShared }) => {
           {managed && configured && <Btn variant="secondary" onClick={removeKey} disabled={busy}>Remove key</Btn>}
           {status.text && <span style={{ fontSize: 13, color: statusColor, marginLeft: 'auto' }}>{status.text}</span>}
         </div>
+        {managed && aiUsage && <div style={{ marginTop: 16, padding: '10px 12px', borderRadius: 8, background: COLORS.bg, color: COLORS.textSoft, fontSize: 12 }}>This month: {Number(aiUsage.requests || 0).toLocaleString()} AI requests · {Number(aiUsage.inputTokens || 0).toLocaleString()} input tokens · {Number(aiUsage.outputTokens || 0).toLocaleString()} output tokens</div>}
       </Card>
       {managed && <Card style={{ padding: 24 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 4 }}>Resend email delivery</div>

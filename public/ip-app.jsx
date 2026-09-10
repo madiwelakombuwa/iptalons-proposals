@@ -449,6 +449,7 @@ const App = () => {
       const idx = prev.findIndex(x => x.id === p.id);
       return idx >= 0 ? prev.map((x, i) => i === idx ? p : x) : [p, ...prev];
     });
+    if (authMode === 'access') shared.scheduleRecord('proposal', p);
   };
 
   // Update a proposal in place without switching the active editor proposal
@@ -456,6 +457,7 @@ const App = () => {
   const updateProposal = (p) => {
     setProposals(prev => prev.map(x => x.id === p.id ? p : x));
     setCurrentProp(c => (c && c.id === p.id ? p : c));
+    if (authMode === 'access') shared.scheduleRecord('proposal', p);
   };
 
   const draftCount = proposals.filter(p => p.status === 'draft').length;
