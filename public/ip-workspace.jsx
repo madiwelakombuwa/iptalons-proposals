@@ -67,6 +67,41 @@ function useSharedWorkspace({ mode, auth, proposals, prospects, setProposals, se
     } catch (e) { setMessage(`${saved} records saved. ${e.message} Your remaining edits are still in this tab; use Export edits.`); }
     finally { setBusy(false); setGeneration(x => x+1); }
   };
+  const upsertRecord = async (kind, record) => {
+    if (!enabled) throw new Error('Shared workspace is not enabled.');
+    setBusy(true);
+    try {
+      const before = bases.current[kind].get(record.id);
+      const result = await request(`/api/workspace/records/${kind}/${encodeURIComponent(record.id)}`, { record, expectedRevision: before?.revision || 0 });
+      bases.current[kind].set(record.id, { revision: result.revision, json: JSON.stringify(record) });
+      const setter = kind === 'proposal' ? setProposals : setProspects;
+      setter(rows => rows.some(row => row.id === record.id) ? rows.map(row => row.id === record.id ? record : row) : [record, ...rows]);
+      setMessage(`${kind === 'prospect' ? 'Prospect' : 'Proposal'} saved to the workspace.`);
+      setGeneration(x => x+1);
+      return result;
+    } catch (error) {
+      setMessage(error.message); throw error;
+    } finally { setBusy(false); }
+  };
+  const deleteRecord = async (kind, id) => {
+    if (!enabled) throw new Error('Shared workspace is not enabled.');
+    const before = bases.current[kind].get(id);
+    if (!before) throw new Error('Reload the workspace before deleting this record.');
+    setBusy(true);
+    try {
+      const response = await fetch(`/api/workspace/records/${kind}/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedRevision: before.revision }) });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || `Delete failed (${response.status})`);
+      bases.current[kind].delete(id);
+      const setter = kind === 'proposal' ? setProposals : setProspects;
+      setter(rows => rows.filter(row => row.id !== id));
+      setMessage(`${kind === 'prospect' ? 'Prospect' : 'Proposal'} deleted from the workspace.`);
+      setGeneration(x => x+1);
+      return result;
+    } catch (error) {
+      setMessage(error.message); throw error;
+    } finally { setBusy(false); }
+  };
   const prepareImport = backup => {
     try {
       const p = JSON.parse(backup.storage?.ip_proposals_v2 || '[]'), c = JSON.parse(backup.storage?.ip_prospects_v1 || '[]');
@@ -104,7 +139,7 @@ function useSharedWorkspace({ mode, auth, proposals, prospects, setProposals, se
       <button disabled={busy || dirty} onClick={importRecords}>Import reviewed records</button><button disabled={busy} onClick={() => setReview(null)}>Cancel</button>
     </div>}
   </div>;
-  return { ready, busy, dirty, controls, exportEdits };
+  return { ready, busy, dirty, controls, exportEdits, upsertRecord, deleteRecord };
 }
 
 function ManagedTeam({ currentUser }) {

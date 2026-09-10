@@ -1889,6 +1889,7 @@ const Signals = ({ signals, syncedAt, error, onUpdate, onSync, onDraft }) => {
 const AddProspectModal = ({ prospect = null, onClose, onSave }) => {
   const [form, setForm] = useState(() => prospect ? { ...prospect, researcherCount: prospect.researcherCount ?? '', federalFunding: prospect.federalFunding ?? '' } : { name: '', type: 'university', contact: '', email: '', researcherCount: '', federalFunding: '', primaryRisk: '' });
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
   const field = (key, label, type = 'text', required = false) => (
     <label style={{ display: 'grid', gap: 6, fontSize: 12, fontWeight: 600, color: COLORS.textMid }}>
       {label}{required ? ' *' : ''}
@@ -1897,18 +1898,22 @@ const AddProspectModal = ({ prospect = null, onClose, onSave }) => {
         style={{ padding: '9px 11px', border: `1px solid ${COLORS.border}`, borderRadius: 7, font: 'inherit', color: COLORS.text }} />
     </label>
   );
-  const submit = e => {
+  const submit = async e => {
     e.preventDefault();
     const name = form.name.trim();
     if (!name) { setError('Institution name is required.'); return; }
-    onSave({
-      ...prospect, id: prospect?.id || crypto.randomUUID(), name, type: form.type,
-      contact: form.contact.trim(), email: form.email.trim(),
-      researcherCount: form.researcherCount === '' ? null : Math.max(0, Number(form.researcherCount) || 0),
-      federalFunding: form.federalFunding === '' ? null : Math.max(0, Number(form.federalFunding) || 0),
-      primaryRisk: form.primaryRisk.trim(), createdAt: prospect?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(),
-    });
-    onClose();
+    setSaving(true); setError('');
+    try {
+      await onSave({
+        ...prospect, id: prospect?.id || crypto.randomUUID(), name, type: form.type,
+        contact: form.contact.trim(), email: form.email.trim(),
+        researcherCount: form.researcherCount === '' ? null : Math.max(0, Number(form.researcherCount) || 0),
+        federalFunding: form.federalFunding === '' ? null : Math.max(0, Number(form.federalFunding) || 0),
+        primaryRisk: form.primaryRisk.trim(), createdAt: prospect?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(),
+      });
+      onClose();
+    } catch (saveError) { setError(saveError.message || 'The prospect could not be saved.'); }
+    finally { setSaving(false); }
   };
   return (
     <div role="dialog" aria-modal="true" aria-label="Add prospect" onClick={onClose}
@@ -1938,8 +1943,8 @@ const AddProspectModal = ({ prospect = null, onClose, onSave }) => {
         </div>
         {error && <div role="alert" style={{ color: COLORS.red, fontSize: 12, marginTop: 12 }}>{error}</div>}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
-          <Btn type="button" variant="secondary" onClick={onClose}>Cancel</Btn>
-          <Btn type="submit">{prospect ? 'Save changes' : 'Add prospect'}</Btn>
+          <Btn type="button" variant="secondary" onClick={onClose} disabled={saving}>Cancel</Btn>
+          <Btn type="submit" disabled={saving}>{saving ? 'Saving…' : prospect ? 'Save changes' : 'Add prospect'}</Btn>
         </div>
       </form>
     </div>
@@ -1950,6 +1955,7 @@ const Prospects = ({ prospects, onSync, syncedAt, news, onAdd, onUpdate, onDelet
   const [syncing, setSyncing] = useState(false);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [actionError, setActionError] = useState('');
   const radarCount = prospects.filter(p => p.radar).length;
 
   const syncNow = async () => {
@@ -2023,7 +2029,7 @@ const Prospects = ({ prospects, onSync, syncedAt, news, onAdd, onUpdate, onDelet
                   </td>
                   <td style={{ padding: '10px 12px', borderBottom: `1px solid ${COLORS.border}`, whiteSpace: 'nowrap' }}>
                     <button onClick={() => setEditing(p)} style={{ border: 0, background: 'none', color: COLORS.blue, cursor: 'pointer', font: 'inherit', fontSize: 11.5, fontWeight: 600 }}>View / Edit</button>
-                    <button onClick={() => { if (window.confirm(`Delete ${p.name}? The deletion is applied when you save shared changes.`)) onDelete(p.id); }}
+                    <button onClick={async () => { if (window.confirm(`Delete ${p.name}? This removes it from the shared workspace.`)) { setActionError(''); try { await onDelete(p.id); } catch (error) { setActionError(error.message || 'Delete failed.'); } } }}
                       style={{ border: 0, background: 'none', color: COLORS.red, cursor: 'pointer', font: 'inherit', fontSize: 11.5, fontWeight: 600 }}>Delete</button>
                   </td>
                 </tr>
@@ -2033,8 +2039,9 @@ const Prospects = ({ prospects, onSync, syncedAt, news, onAdd, onUpdate, onDelet
         </table>
         </div>
       </Card>
+      {actionError && <div role="alert" style={{ marginTop: 12, color: COLORS.red, fontSize: 12 }}>{actionError}</div>}
       {adding && <AddProspectModal onClose={() => setAdding(false)} onSave={onAdd} />}
-      {editing && <AddProspectModal prospect={editing} onClose={() => setEditing(null)} onSave={record => { onUpdate(record); setEditing(null); }} />}
+      {editing && <AddProspectModal prospect={editing} onClose={() => setEditing(null)} onSave={onUpdate} />}
     </div>
   );
 };

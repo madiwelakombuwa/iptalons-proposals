@@ -707,9 +707,9 @@ const App = () => {
                 }} />
             )}
               {screen === 'prospects' && <Prospects prospects={prospects} onSync={loadSignals} syncedAt={signalsSyncedAt} news={displayNews}
-                onAdd={prospect => setProspects(prev => [prospect, ...prev])}
-                onUpdate={prospect => setProspects(prev => prev.map(row => row.id === prospect.id ? prospect : row))}
-                onDelete={id => setProspects(prev => prev.filter(row => row.id !== id))} />}
+                onAdd={prospect => authMode === 'access' ? shared.upsertRecord('prospect', prospect) : setProspects(prev => [prospect, ...prev])}
+                onUpdate={prospect => authMode === 'access' ? shared.upsertRecord('prospect', prospect) : setProspects(prev => prev.map(row => row.id === prospect.id ? prospect : row))}
+                onDelete={id => authMode === 'access' ? shared.deleteRecord('prospect', id) : setProspects(prev => prev.filter(row => row.id !== id))} />}
             {screen === 'services'  && <ServicesScreen />}
             {screen === 'templates' && <Templates />}
             {screen === 'reports'   && <Analytics proposals={proposals} />}
