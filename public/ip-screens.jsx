@@ -1886,8 +1886,69 @@ const Signals = ({ signals, syncedAt, error, onUpdate, onSync, onDraft }) => {
   );
 };
 
-const Prospects = ({ prospects, onSync, syncedAt, news }) => {
+const AddProspectModal = ({ onClose, onAdd }) => {
+  const [form, setForm] = useState({ name: '', type: 'university', contact: '', email: '', researcherCount: '', federalFunding: '', primaryRisk: '' });
+  const [error, setError] = useState('');
+  const field = (key, label, type = 'text', required = false) => (
+    <label style={{ display: 'grid', gap: 6, fontSize: 12, fontWeight: 600, color: COLORS.textMid }}>
+      {label}{required ? ' *' : ''}
+      <input type={type} value={form[key]} min={type === 'number' ? 0 : undefined}
+        onChange={e => setForm(v => ({ ...v, [key]: e.target.value }))}
+        style={{ padding: '9px 11px', border: `1px solid ${COLORS.border}`, borderRadius: 7, font: 'inherit', color: COLORS.text }} />
+    </label>
+  );
+  const submit = e => {
+    e.preventDefault();
+    const name = form.name.trim();
+    if (!name) { setError('Institution name is required.'); return; }
+    onAdd({
+      id: crypto.randomUUID(), name, type: form.type,
+      contact: form.contact.trim(), email: form.email.trim(),
+      researcherCount: form.researcherCount === '' ? null : Math.max(0, Number(form.researcherCount) || 0),
+      federalFunding: form.federalFunding === '' ? null : Math.max(0, Number(form.federalFunding) || 0),
+      primaryRisk: form.primaryRisk.trim(), createdAt: new Date().toISOString(),
+    });
+    onClose();
+  };
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Add prospect" onClick={onClose}
+      style={{ position: 'fixed', inset: 0, zIndex: 1100, display: 'grid', placeItems: 'center', padding: 20, background: 'rgba(31,42,27,0.55)' }}>
+      <form onSubmit={submit} onClick={e => e.stopPropagation()}
+        style={{ width: 'min(620px, 100%)', maxHeight: '90vh', overflowY: 'auto', background: '#fff', borderRadius: 14, boxShadow: COLORS.shadowLg, padding: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 20, marginBottom: 20 }}>
+          <div><h2 style={{ margin: 0, fontSize: 19 }}>Add prospect</h2><p style={{ margin: '5px 0 0', fontSize: 12, color: COLORS.textSoft }}>Create an institution or company in the shared pipeline.</p></div>
+          <button type="button" aria-label="Close" onClick={onClose} style={{ border: 0, background: 'none', cursor: 'pointer', fontSize: 22, color: COLORS.textSoft }}>×</button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
+          <div style={{ gridColumn: '1 / -1' }}>{field('name', 'Institution name', 'text', true)}</div>
+          <label style={{ display: 'grid', gap: 6, fontSize: 12, fontWeight: 600, color: COLORS.textMid }}>Type
+            <select value={form.type} onChange={e => setForm(v => ({ ...v, type: e.target.value }))}
+              style={{ padding: '9px 11px', border: `1px solid ${COLORS.border}`, borderRadius: 7, font: 'inherit', background: '#fff', color: COLORS.text }}>
+              {Object.entries(PROSPECT_TYPE_CONFIG).map(([value, cfg]) => <option key={value} value={value}>{cfg.label}</option>)}
+            </select>
+          </label>
+          {field('contact', 'Primary contact')}
+          {field('email', 'Email', 'email')}
+          {field('researcherCount', 'Researchers', 'number')}
+          {field('federalFunding', 'Annual federal funding ($)', 'number')}
+          <label style={{ gridColumn: '1 / -1', display: 'grid', gap: 6, fontSize: 12, fontWeight: 600, color: COLORS.textMid }}>Primary risk or signal
+            <textarea value={form.primaryRisk} onChange={e => setForm(v => ({ ...v, primaryRisk: e.target.value }))} rows={3}
+              style={{ padding: '9px 11px', border: `1px solid ${COLORS.border}`, borderRadius: 7, font: 'inherit', resize: 'vertical', color: COLORS.text }} />
+          </label>
+        </div>
+        {error && <div role="alert" style={{ color: COLORS.red, fontSize: 12, marginTop: 12 }}>{error}</div>}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+          <Btn type="button" variant="secondary" onClick={onClose}>Cancel</Btn>
+          <Btn type="submit">Add prospect</Btn>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+const Prospects = ({ prospects, onSync, syncedAt, news, onAdd }) => {
   const [syncing, setSyncing] = useState(false);
+  const [adding, setAdding] = useState(false);
   const radarCount = prospects.filter(p => p.radar).length;
 
   const syncNow = async () => {
@@ -1908,7 +1969,7 @@ const Prospects = ({ prospects, onSync, syncedAt, news }) => {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Btn variant="secondary" onClick={syncNow} disabled={syncing}>{syncing ? 'Syncing…' : '📡 Sync now'}</Btn>
-          <Btn icon="+">Add Prospect</Btn>
+          <Btn icon="+" onClick={() => setAdding(true)}>Add Prospect</Btn>
         </div>
       </div>
 
@@ -1966,6 +2027,7 @@ const Prospects = ({ prospects, onSync, syncedAt, news }) => {
         </table>
         </div>
       </Card>
+      {adding && <AddProspectModal onClose={() => setAdding(false)} onAdd={onAdd} />}
     </div>
   );
 };

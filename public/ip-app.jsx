@@ -706,7 +706,7 @@ const App = () => {
                   startNew(p);
                 }} />
             )}
-            {screen === 'prospects' && <Prospects prospects={prospects} onSync={loadSignals} syncedAt={signalsSyncedAt} news={displayNews} />}
+              {screen === 'prospects' && <Prospects prospects={prospects} onSync={loadSignals} syncedAt={signalsSyncedAt} news={displayNews} onAdd={prospect => setProspects(prev => [prospect, ...prev])} />}
             {screen === 'services'  && <ServicesScreen />}
             {screen === 'templates' && <Templates />}
             {screen === 'reports'   && <Analytics proposals={proposals} />}
