@@ -1,5 +1,6 @@
 import { build } from "esbuild";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, unlink, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 
 const read = (name) => readFile(new URL(`../public/${name}`, import.meta.url), "utf8");
 const prelude = `
@@ -29,7 +30,19 @@ async function bundle(name, source) {
   });
 }
 
-await bundle("app", [components, screens, workspace, app].join("\n"));
+await bundle("app-build", [components, screens, workspace, app].join("\n"));
+const assetsDir = new URL("../public/assets/", import.meta.url);
+const temporaryApp = new URL("app-build.js", assetsDir);
+const appBytes = await readFile(temporaryApp);
+const appHash = createHash("sha256").update(appBytes).digest("hex").slice(0, 12);
+const appFile = `app.${appHash}.js`;
+for (const file of await readdir(assetsDir)) {
+  if (/^app\.[a-f0-9]{12}\.js$/.test(file) && file !== appFile) await unlink(new URL(file, assetsDir));
+}
+await rename(temporaryApp, new URL(appFile, assetsDir));
+const indexUrl = new URL("../public/index.html", import.meta.url);
+const index = await readFile(indexUrl, "utf8");
+await writeFile(indexUrl, index.replace(/\/assets\/app(?:\.[a-f0-9]{12})?\.js/g, `/assets/${appFile}`));
 await build({
   stdin: { contents: share, loader: "js" },
   outfile: new URL("../public/assets/share.js", import.meta.url).pathname,
