@@ -2169,7 +2169,11 @@ const SettingsScreen = ({ managed = false, exportShared }) => {
   const [busy, setBusy] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [configured, setConfigured] = useState(false);
+  const [resendKey, setResendKey] = useState('');
+  const [resendFrom, setResendFrom] = useState('IPTalons Proposals <proposals@mail.iptalons.com>');
+  const [resendConfigured, setResendConfigured] = useState(false);
   useEffect(() => { if (managed) fetch('/api/settings/ai').then(r => r.json()).then(d => setConfigured(Boolean(d.configured))).catch(() => {}); }, [managed]);
+  useEffect(() => { if (managed) fetch('/api/settings/email').then(r => r.json()).then(d => { setResendConfigured(Boolean(d.configured)); if (d.from) setResendFrom(d.from); }).catch(() => {}); }, [managed]);
 
   const save = async () => {
     localStorage.setItem('ip_model', model);
@@ -2207,6 +2211,24 @@ const SettingsScreen = ({ managed = false, exportShared }) => {
     setApiKey(''); setConfigured(false); setStatus({ kind: 'ok', text: 'API key removed' });
   };
 
+  const saveEmail = async () => {
+    if (!resendKey.trim()) { setStatus({ kind: 'err', text: 'Enter the Resend API key' }); return; }
+    setBusy(true);
+    const response = await fetch('/api/settings/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey: resendKey.trim(), from: resendFrom.trim() }) });
+    const result = await response.json().catch(() => ({})); setBusy(false);
+    if (!response.ok) { setStatus({ kind: 'err', text: result.error || 'Unable to save Resend settings' }); return; }
+    setResendKey(''); setResendConfigured(true); setStatus({ kind: 'ok', text: 'Resend settings saved securely' });
+  };
+
+  const removeEmail = async () => {
+    if (!confirm('Remove the workspace Resend API key? Email delivery will stop until new settings are saved.')) return;
+    setBusy(true);
+    const response = await fetch('/api/settings/email', { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
+    const result = await response.json().catch(() => ({})); setBusy(false);
+    if (!response.ok) { setStatus({ kind: 'err', text: result.error || 'Unable to remove Resend settings' }); return; }
+    setResendKey(''); setResendConfigured(false); setStatus({ kind: 'ok', text: 'Resend settings removed' });
+  };
+
   const statusColor = status.kind === 'ok' ? COLORS.green : status.kind === 'err' ? COLORS.red : COLORS.textSoft;
 
   return (
@@ -2220,7 +2242,7 @@ const SettingsScreen = ({ managed = false, exportShared }) => {
         <p>{managed ? "Export the loaded workspace records, including unsaved edits. Keep the file private. The import review in the toolbar adds new records and skips conflicts; it does not overwrite existing versions." : "Export this browser’s proposal and prospect records before changing browsers or clearing site data. Keep the file private."}</p>
         <Btn onClick={managed ? exportShared : exportBackup}>Export backup</Btn>
       </Card>
-      <Card style={{ padding: 24 }}>
+      <Card style={{ padding: 24, marginBottom: 20 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 4 }}>Claude API</div>
         <div style={{ fontSize: 12, color: COLORS.textSoft, marginBottom: 20 }}>
           AI access is managed by the workspace administrator. Requests require a signed-in session and are subject to workspace limits.
@@ -2240,6 +2262,27 @@ const SettingsScreen = ({ managed = false, exportShared }) => {
           {status.text && <span style={{ fontSize: 13, color: statusColor, marginLeft: 'auto' }}>{status.text}</span>}
         </div>
       </Card>
+      {managed && <Card style={{ padding: 24 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 4 }}>Resend email delivery</div>
+        <div style={{ fontSize: 12, color: COLORS.textSoft, marginBottom: 20 }}>
+          Send approved proposal links from a verified Resend domain. The API key is encrypted and cannot be displayed after saving.
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <label style={{ display: 'grid', gap: 6, fontSize: 12, fontWeight: 600, color: COLORS.textMid }}>Sender
+            <input value={resendFrom} onChange={e => setResendFrom(e.target.value)} placeholder="IPTalons Proposals <proposals@mail.iptalons.com>"
+              style={{ padding: '9px 11px', border: `1px solid ${COLORS.border}`, borderRadius: 7, font: 'inherit' }} />
+          </label>
+          <label style={{ display: 'grid', gap: 6, fontSize: 12, fontWeight: 600, color: COLORS.textMid }}>Resend API key
+            <input type="password" autoComplete="off" value={resendKey} onChange={e => setResendKey(e.target.value)} placeholder={resendConfigured ? 'Configured — enter a new key to replace it' : 're_…'}
+              style={{ padding: '9px 11px', border: `1px solid ${COLORS.border}`, borderRadius: 7, font: 'inherit' }} />
+            <span style={{ fontWeight: 400, color: resendConfigured ? COLORS.green : COLORS.textSoft }}>{resendConfigured ? '✓ Workspace email delivery is configured.' : 'No Resend API key is configured.'}</span>
+          </label>
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 24, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Btn onClick={saveEmail} disabled={busy}>Save Resend settings</Btn>
+          {resendConfigured && <Btn variant="secondary" onClick={removeEmail} disabled={busy}>Remove key</Btn>}
+        </div>
+      </Card>}
     </div>
   );
 };

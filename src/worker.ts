@@ -62,6 +62,21 @@ async function configuredClaudeKey(env: Env) {
   const row = await env.DB.prepare("SELECT encrypted_value FROM workspace_settings WHERE key='anthropic_api_key'").first<{ encrypted_value: string }>();
   return row ? decryptSetting(row.encrypted_value, env.SETTINGS_ENCRYPTION_KEY) : null;
 }
+async function configuredResend(env: Env): Promise<{ apiKey: string; from: string } | null> {
+  if (env.RESEND_API_KEY) return { apiKey: env.RESEND_API_KEY, from: env.EMAIL_FROM || "IPTalons Proposals <onboarding@resend.dev>" };
+  if (!env.DB || !env.SETTINGS_ENCRYPTION_KEY) return null;
+  const rows = await env.DB.prepare("SELECT key,encrypted_value FROM workspace_settings WHERE key IN ('resend_api_key','resend_from')").all<{ key: string; encrypted_value: string }>();
+  const values = new Map(rows.results.map(row => [row.key, row.encrypted_value]));
+  const encryptedKey = values.get('resend_api_key'), encryptedFrom = values.get('resend_from');
+  if (!encryptedKey || !encryptedFrom) return null;
+  return { apiKey: await decryptSetting(encryptedKey, env.SETTINGS_ENCRYPTION_KEY), from: await decryptSetting(encryptedFrom, env.SETTINGS_ENCRYPTION_KEY) };
+}
+
+function validSender(value: string) {
+  if (value.length > 200 || /[\r\n]/.test(value)) return false;
+  const address = value.match(/<([^<>]+)>\s*$/)?.[1] || value;
+  return /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(address);
+}
 
 async function hmac(secret: string, msg: string): Promise<string> {
   const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
@@ -325,11 +340,11 @@ async function buildDigest(env: Env, origin: string) {
   return { subject, html, text, seenHandles: radar ? leads.map(l => l.handle) : null, stats: { signals: leads.length, newSignals: newLeads.length, sharesCreated: sharesCreated.length, emailsToday: emailsToday.length, viewsToday: viewsToday.reduce((n, v) => n + v.count, 0), attention: attentionCount } };
 }
 
-async function sendViaResend(env: Env, to: string[], subject: string, html: string, text: string, idempotencyKey?: string): Promise<Response> {
+async function sendViaResend(apiKey: string, from: string, to: string[], subject: string, html: string, text: string, idempotencyKey?: string): Promise<Response> {
   return fetch("https://api.resend.com/emails", {
     method: "POST",
-    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json", ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}) },
-    body: JSON.stringify({ from: env.EMAIL_FROM || "IPTalons Proposals <onboarding@resend.dev>", to, subject, html, text }),
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}) },
+    body: JSON.stringify({ from, to, subject, html, text }),
   });
 }
 
@@ -337,8 +352,9 @@ async function sendViaResend(env: Env, to: string[], subject: string, html: stri
 // set, otherwise the Apps Script mailer (sends from the owner's Google
 // account; ~100 emails/day quota). Returns null if neither is configured.
 async function dispatchEmail(env: Env, to: string[], subject: string, html: string, text: string, idempotencyKey?: string): Promise<{ ok: boolean; provider: string; detail: string; providerId?: string } | null> {
-  if (env.RESEND_API_KEY) {
-    const resp = await sendViaResend(env, to, subject, html, text, idempotencyKey);
+  const resend = await configuredResend(env);
+  if (resend) {
+    const resp = await sendViaResend(resend.apiKey, resend.from, to, subject, html, text, idempotencyKey);
     const responseText = await resp.text();
     let providerId = "";
     if (resp.ok) { try { providerId = String((JSON.parse(responseText) as { id?: string }).id || ""); } catch {} }
@@ -426,6 +442,40 @@ export default {
       if (request.method === 'DELETE') {
         await env.DB.prepare("DELETE FROM workspace_settings WHERE key='anthropic_api_key'").run();
         return json({ configured: false });
+      }
+      return json({ error: 'Method not allowed' }, 405);
+    }
+
+    if (url.pathname === '/api/settings/email') {
+      if (!identity) return json({ error: 'Individual workspace sign-in required' }, 401);
+      if (identity.role !== 'admin') return json({ error: 'Only workspace administrators may configure email' }, 403);
+      if (!env.DB || !env.SETTINGS_ENCRYPTION_KEY) return json({ error: 'Encrypted settings storage is not configured' }, 503);
+      if (request.method === 'GET') {
+        if (env.RESEND_API_KEY) return json({ configured: true, from: env.EMAIL_FROM || '', source: 'environment' });
+        const rows = await env.DB.prepare("SELECT key,encrypted_value,updated_by,updated_at FROM workspace_settings WHERE key IN ('resend_api_key','resend_from')").all<{ key: string; encrypted_value: string; updated_by: string; updated_at: string }>();
+        const keyRow = rows.results.find(row => row.key === 'resend_api_key');
+        const fromRow = rows.results.find(row => row.key === 'resend_from');
+        let from = '';
+        if (fromRow) try { from = await decryptSetting(fromRow.encrypted_value, env.SETTINGS_ENCRYPTION_KEY); } catch { return json({ error: 'The encrypted email settings could not be read. Save them again.' }, 503); }
+        return json({ configured: Boolean(keyRow && fromRow), from, updatedBy: keyRow?.updated_by || null, updatedAt: keyRow?.updated_at || null, source: 'workspace' });
+      }
+      if (request.method === 'POST') {
+        let body: { apiKey?: string; from?: string }; try { body = await request.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
+        const apiKey = String(body.apiKey || '').trim(), from = String(body.from || '').trim();
+        if (apiKey.length < 20 || apiKey.length > 300) return json({ error: 'Enter a valid Resend API key' }, 400);
+        if (!validSender(from)) return json({ error: 'Enter a valid sender, such as IPTalons Proposals <proposals@mail.iptalons.com>' }, 400);
+        const encryptedKey = await encryptSetting(apiKey, env.SETTINGS_ENCRYPTION_KEY);
+        const encryptedFrom = await encryptSetting(from, env.SETTINGS_ENCRYPTION_KEY);
+        const now = new Date().toISOString();
+        await env.DB.batch([
+          env.DB.prepare("INSERT INTO workspace_settings(key,encrypted_value,updated_by,updated_at) VALUES('resend_api_key',?,?,?) ON CONFLICT(key) DO UPDATE SET encrypted_value=excluded.encrypted_value,updated_by=excluded.updated_by,updated_at=excluded.updated_at").bind(encryptedKey,identity.email,now),
+          env.DB.prepare("INSERT INTO workspace_settings(key,encrypted_value,updated_by,updated_at) VALUES('resend_from',?,?,?) ON CONFLICT(key) DO UPDATE SET encrypted_value=excluded.encrypted_value,updated_by=excluded.updated_by,updated_at=excluded.updated_at").bind(encryptedFrom,identity.email,now),
+        ]);
+        return json({ configured: true, from, updatedBy: identity.email, updatedAt: now });
+      }
+      if (request.method === 'DELETE') {
+        await env.DB.prepare("DELETE FROM workspace_settings WHERE key IN ('resend_api_key','resend_from')").run();
+        return json({ configured: false, from: '' });
       }
       return json({ error: 'Method not allowed' }, 405);
     }
@@ -607,7 +657,7 @@ export default {
   // No-ops (harmlessly) until RESEND_API_KEY and DIGEST_TO are configured.
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     if (env.APIFY_API_TOKEN) await collectApifySignals(env.SHARES, env.APIFY_API_TOKEN);
-    const configured = env.RESEND_API_KEY || (env.MAILER_URL && env.MAILER_SECRET);
+    const configured = (await configuredResend(env)) || (env.MAILER_URL && env.MAILER_SECRET);
     if (!configured || !env.DIGEST_TO) return;
     const origin = env.APP_ORIGIN || "https://iptalons-proposals.skyabove.workers.dev";
     const digest = await buildDigest(env, origin);
