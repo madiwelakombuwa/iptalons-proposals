@@ -2167,10 +2167,20 @@ const SettingsScreen = ({ managed = false, exportShared }) => {
   const [model, setModel]   = useState(() => localStorage.getItem('ip_model')   || 'claude-opus-4-7');
   const [status, setStatus] = useState({ kind: '', text: '' });
   const [busy, setBusy] = useState(false);
+  const [apiKey, setApiKey] = useState('');
+  const [configured, setConfigured] = useState(false);
+  useEffect(() => { if (managed) fetch('/api/settings/ai').then(r => r.json()).then(d => setConfigured(Boolean(d.configured))).catch(() => {}); }, [managed]);
 
-  const save = () => {
+  const save = async () => {
     localStorage.setItem('ip_model', model);
-    setStatus({ kind: 'ok', text: 'Saved' });
+    if (managed && apiKey.trim()) {
+      setBusy(true);
+      const response = await fetch('/api/settings/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey: apiKey.trim() }) });
+      const result = await response.json().catch(() => ({})); setBusy(false);
+      if (!response.ok) { setStatus({ kind: 'err', text: result.error || 'Unable to save API key' }); return; }
+      setApiKey(''); setConfigured(true);
+    }
+    setStatus({ kind: 'ok', text: 'Saved securely' });
     setTimeout(() => setStatus({ kind: '', text: '' }), 2500);
   };
 
@@ -2185,6 +2195,16 @@ const SettingsScreen = ({ managed = false, exportShared }) => {
       setStatus({ kind: 'err', text: e.message || 'Request failed' });
     }
     setBusy(false);
+  };
+
+  const removeKey = async () => {
+    if (!confirm('Remove the workspace Claude API key? AI drafting will stop until a new key is saved.')) return;
+    setBusy(true);
+    const response = await fetch('/api/settings/ai', { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
+    const result = await response.json().catch(() => ({}));
+    setBusy(false);
+    if (!response.ok) { setStatus({ kind: 'err', text: result.error || 'Unable to remove API key' }); return; }
+    setApiKey(''); setConfigured(false); setStatus({ kind: 'ok', text: 'API key removed' });
   };
 
   const statusColor = status.kind === 'ok' ? COLORS.green : status.kind === 'err' ? COLORS.red : COLORS.textSoft;
@@ -2207,10 +2227,16 @@ const SettingsScreen = ({ managed = false, exportShared }) => {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <Select label="Model" value={model} onChange={setModel} options={MODEL_OPTIONS} />
+          {managed && <label style={{ display: 'grid', gap: 6, fontSize: 12, fontWeight: 600, color: COLORS.textMid }}>Claude API key
+            <input type="password" autoComplete="off" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder={configured ? 'Configured — enter a new key to replace it' : 'sk-ant-…'}
+              style={{ padding: '9px 11px', border: `1px solid ${COLORS.border}`, borderRadius: 7, font: 'inherit' }} />
+            <span style={{ fontWeight: 400, color: configured ? COLORS.green : COLORS.textSoft }}>{configured ? '✓ A workspace key is configured. It is encrypted and cannot be displayed.' : 'No workspace key is configured.'}</span>
+          </label>}
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 24, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Btn onClick={save}>Save</Btn>
+          <Btn onClick={save} disabled={busy}>Save</Btn>
           <Btn variant="secondary" onClick={test} disabled={busy}>Test connection</Btn>
+          {managed && configured && <Btn variant="secondary" onClick={removeKey} disabled={busy}>Remove key</Btn>}
           {status.text && <span style={{ fontSize: 13, color: statusColor, marginLeft: 'auto' }}>{status.text}</span>}
         </div>
       </Card>

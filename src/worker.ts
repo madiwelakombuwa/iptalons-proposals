@@ -16,6 +16,7 @@ interface Env extends WorkerBindings {
   RESEND_API_KEY?: string;
   EMAIL_FROM?: string;
   APP_ORIGIN?: string;
+  SETTINGS_ENCRYPTION_KEY?: string;
   MAILER_URL?: string; // Apps Script mailer web app (send_email command)
   MAILER_SECRET?: string;
   DIGEST_TO?: string; // recipient(s) for the daily summary email, comma-separated
@@ -37,6 +38,30 @@ const MAX_VIEWS_KEPT = 200;
 
 // ─── Session auth (HMAC cookie, password = APP_PASSWORD secret) ────────────
 const enc = new TextEncoder();
+
+const bytesToBase64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
+const base64ToBytes = (value: string) => Uint8Array.from(atob(value), c => c.charCodeAt(0));
+async function settingsKey(secret: string) {
+  const raw = base64ToBytes(secret);
+  if (raw.byteLength !== 32) throw new Error('SETTINGS_ENCRYPTION_KEY must be 32 bytes');
+  return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt','decrypt']);
+}
+async function encryptSetting(value: string, secret: string) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await settingsKey(secret), enc.encode(value)));
+  const packed = new Uint8Array(iv.length + ciphertext.length); packed.set(iv); packed.set(ciphertext, iv.length);
+  return bytesToBase64(packed);
+}
+async function decryptSetting(value: string, secret: string) {
+  const packed = base64ToBytes(value), iv = packed.slice(0,12), ciphertext = packed.slice(12);
+  return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, await settingsKey(secret), ciphertext));
+}
+async function configuredClaudeKey(env: Env) {
+  if (env.ANTHROPIC_API_KEY) return env.ANTHROPIC_API_KEY;
+  if (!env.DB || !env.SETTINGS_ENCRYPTION_KEY) return null;
+  const row = await env.DB.prepare("SELECT encrypted_value FROM workspace_settings WHERE key='anthropic_api_key'").first<{ encrypted_value: string }>();
+  return row ? decryptSetting(row.encrypted_value, env.SETTINGS_ENCRYPTION_KEY) : null;
+}
 
 async function hmac(secret: string, msg: string): Promise<string> {
   const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
@@ -382,6 +407,29 @@ export default {
       return serveSharePage(request, env, ctx, shareMatch[1], authed);
     }
 
+    if (url.pathname === '/api/settings/ai') {
+      if (!identity) return json({ error: 'Individual workspace sign-in required' }, 401);
+      if (identity.role !== 'admin') return json({ error: 'Only workspace administrators may configure AI' }, 403);
+      if (!env.DB || !env.SETTINGS_ENCRYPTION_KEY) return json({ error: 'Encrypted settings storage is not configured' }, 503);
+      if (request.method === 'GET') {
+        const row = await env.DB.prepare("SELECT updated_by,updated_at FROM workspace_settings WHERE key='anthropic_api_key'").first<{ updated_by: string; updated_at: string }>();
+        return json({ configured: Boolean(row), updatedBy: row?.updated_by || null, updatedAt: row?.updated_at || null });
+      }
+      if (request.method === 'POST') {
+        let body: { apiKey?: string }; try { body = await request.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
+        const apiKey = String(body.apiKey || '').trim();
+        if (apiKey.length < 20 || apiKey.length > 300) return json({ error: 'Enter a valid Claude API key' }, 400);
+        const encrypted = await encryptSetting(apiKey, env.SETTINGS_ENCRYPTION_KEY), now = new Date().toISOString();
+        await env.DB.prepare("INSERT INTO workspace_settings(key,encrypted_value,updated_by,updated_at) VALUES('anthropic_api_key',?,?,?) ON CONFLICT(key) DO UPDATE SET encrypted_value=excluded.encrypted_value,updated_by=excluded.updated_by,updated_at=excluded.updated_at").bind(encrypted,identity.email,now).run();
+        return json({ configured: true, updatedBy: identity.email, updatedAt: now });
+      }
+      if (request.method === 'DELETE') {
+        await env.DB.prepare("DELETE FROM workspace_settings WHERE key='anthropic_api_key'").run();
+        return json({ configured: false });
+      }
+      return json({ error: 'Method not allowed' }, 405);
+    }
+
     if (url.pathname === "/api/claude" && request.method === "POST") {
       if (!authed) return json({ error: "unauthorized — sign in to use AI" }, 401);
       if (env.AI_ENABLED !== "true") return json({ error: "AI drafting is disabled by the workspace administrator" }, 503);
@@ -690,7 +738,12 @@ async function handleClaudeRequest(request: Request, env: Env): Promise<Response
       || (body.system !== undefined && (typeof body.system !== "string" || body.system.length > 20000)))
     return json({ error: "AI requests require bounded text messages" }, 400);
 
-  const apiKey = env.ANTHROPIC_API_KEY;
+  let apiKey: string | null;
+  try {
+    apiKey = await configuredClaudeKey(env);
+  } catch {
+    return json({ error: "The encrypted AI credential could not be read. Ask the workspace administrator to save it again." }, 503);
+  }
   if (!apiKey) {
     return json(
       { error: "AI is not configured. Ask the workspace administrator to configure the provider." },

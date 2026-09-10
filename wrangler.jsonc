@@ -31,7 +31,7 @@
     ]
   },
   "vars": {
-    "AI_ENABLED": "false",
+    "AI_ENABLED": "true",
     "APP_ORIGIN": "https://iptalons-proposals.skyabove.workers.dev",
     "AUTH_MODE": "access",
     "ACCESS_TEAM_DOMAIN": "lucky-moon-a847.cloudflareaccess.com",
@@ -68,7 +68,7 @@
       "preview_urls": false,
       "routes": [],
       "vars": {
-        "AI_ENABLED": "false",
+        "AI_ENABLED": "true",
         "APP_ORIGIN": "https://iptalons-proposals-staging.skyabove.workers.dev",
         "AUTH_MODE": "access",
         "ACCESS_TEAM_DOMAIN": "lucky-moon-a847.cloudflareaccess.com",
