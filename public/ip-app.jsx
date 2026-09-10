@@ -454,10 +454,10 @@ const App = () => {
 
   // Update a proposal in place without switching the active editor proposal
   // (used by list-level edits like the Notes modal).
-  const updateProposal = (p) => {
+  const updateProposal = async (p) => {
     setProposals(prev => prev.map(x => x.id === p.id ? p : x));
     setCurrentProp(c => (c && c.id === p.id ? p : c));
-    if (authMode === 'access') shared.scheduleRecord('proposal', p);
+    if (authMode === 'access') return shared.upsertRecord('proposal', p);
   };
 
   const draftCount = proposals.filter(p => p.status === 'draft').length;

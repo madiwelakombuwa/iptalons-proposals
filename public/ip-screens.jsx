@@ -371,6 +371,7 @@ const ShareModal = ({ managed = false, proposal, onClose, onShared, onProposalCh
 // in the editor's Activity & Follow-up timeline and in recent-activity notifications.
 const NotesModal = ({ proposal, onUpdate, onClose }) => {
   const [text, setText] = useState('');
+  const [saving, setSaving] = useState(false), [error, setError] = useState('');
   const inputRef = useRef();
   useEffect(() => { inputRef.current && inputRef.current.focus(); }, []);
 
@@ -379,16 +380,22 @@ const NotesModal = ({ proposal, onUpdate, onClose }) => {
   })();
   const notes = (proposal.activities || []).filter(a => a.type === 'note');
 
-  const addNote = () => {
+  const addNote = async () => {
     const t = text.trim();
     if (!t) return;
     const entry = { id: genId(), type: 'note', date: new Date().toISOString().slice(0, 10), by: authName, content: t };
-    onUpdate({ ...proposal, activities: [entry, ...(proposal.activities || [])] });
-    setText('');
-    inputRef.current && inputRef.current.focus();
+    setSaving(true); setError('');
+    try {
+      await onUpdate({ ...proposal, activities: [entry, ...(proposal.activities || [])] });
+      setText(''); inputRef.current && inputRef.current.focus();
+    } catch (saveError) { setError(saveError.message || 'The note could not be saved.'); }
+    finally { setSaving(false); }
   };
-  const deleteNote = (id) => {
-    onUpdate({ ...proposal, activities: (proposal.activities || []).filter(a => a.id !== id) });
+  const deleteNote = async (id) => {
+    setSaving(true); setError('');
+    try { await onUpdate({ ...proposal, activities: (proposal.activities || []).filter(a => a.id !== id) }); }
+    catch (saveError) { setError(saveError.message || 'The note could not be deleted.'); }
+    finally { setSaving(false); }
   };
 
   return (
@@ -398,7 +405,7 @@ const NotesModal = ({ proposal, onUpdate, onClose }) => {
           <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text }}>📝 Notes · {proposal.prospect?.name || proposal.name}</div>
           <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 16, cursor: 'pointer', color: COLORS.textSoft }}>✕</button>
         </div>
-        <div style={{ fontSize: 11.5, color: COLORS.textSoft, marginBottom: 14 }}>{proposal.proposalNumber} · notes also appear on the proposal's activity timeline</div>
+        <div style={{ fontSize: 11.5, color: COLORS.textSoft, marginBottom: 14 }}>{proposal.proposalNumber ? `${proposal.proposalNumber} · notes also appear on the proposal's activity timeline` : 'Shared prospect notes for relationship context, decisions, and next steps'}</div>
 
         {/* Composer */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 14 }}>
@@ -406,8 +413,9 @@ const NotesModal = ({ proposal, onUpdate, onClose }) => {
             onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); addNote(); } }}
             placeholder="Add a note… (⌘↩ to save)"
             style={{ flex: 1, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 13, fontFamily: 'inherit', lineHeight: 1.55, resize: 'vertical', outline: 'none' }} />
-          <Btn size="sm" onClick={addNote} disabled={!text.trim()}>Add</Btn>
+          <Btn size="sm" onClick={addNote} disabled={!text.trim() || saving}>{saving ? 'Saving…' : 'Add'}</Btn>
         </div>
+        {error && <div role="alert" style={{ color: COLORS.red, fontSize: 12, marginBottom: 10 }}>{error}</div>}
 
         {/* Notes list */}
         <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -421,7 +429,7 @@ const NotesModal = ({ proposal, onUpdate, onClose }) => {
               <div style={{ fontSize: 13, color: COLORS.text, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{n.content}</div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
                 <span style={{ fontSize: 10.5, color: '#9A8B4F' }}>{n.by} · {fmtDate(n.date)}</span>
-                <button onClick={() => deleteNote(n.id)} title="Delete note"
+                <button onClick={() => deleteNote(n.id)} title="Delete note" disabled={saving}
                   style={{ border: 'none', background: 'none', color: '#C4B372', fontSize: 11, cursor: 'pointer', padding: 0 }}
                   onMouseEnter={e => e.currentTarget.style.color = COLORS.red}
                   onMouseLeave={e => e.currentTarget.style.color = '#C4B372'}>delete</button>
@@ -1956,6 +1964,7 @@ const Prospects = ({ prospects, onSync, syncedAt, news, onAdd, onUpdate, onDelet
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(null);
   const [actionError, setActionError] = useState('');
+  const [notesFor, setNotesFor] = useState(null);
   const radarCount = prospects.filter(p => p.radar).length;
 
   const syncNow = async () => {
@@ -1983,7 +1992,7 @@ const Prospects = ({ prospects, onSync, syncedAt, news, onAdd, onUpdate, onDelet
       <Card>
         <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr style={{ background: COLORS.bg }}>{['Institution', 'Type', 'Primary Contact', 'Researchers', 'Federal Funding', 'Primary Risk / Signal', 'Radar', 'Actions'].map(dataTh)}</tr></thead>
+          <thead><tr style={{ background: COLORS.bg }}>{['Institution', 'Type', 'Primary Contact', 'Researchers', 'Federal Funding', 'Primary Risk / Signal', 'Radar', 'Notes', 'Actions'].map(dataTh)}</tr></thead>
           <tbody>
             {prospects.map(p => {
               const cfg = PROSPECT_TYPE_CONFIG[p.type] || {};
@@ -2028,6 +2037,9 @@ const Prospects = ({ prospects, onSync, syncedAt, news, onAdd, onUpdate, onDelet
                     ) : <span style={{ color: COLORS.textGhost }}>—</span>}
                   </td>
                   <td style={{ padding: '10px 12px', borderBottom: `1px solid ${COLORS.border}`, whiteSpace: 'nowrap' }}>
+                    <button onClick={() => setNotesFor(p.id)} title="Prospect notes" style={{ border: `1px solid ${COLORS.border}`, background: '#fff', borderRadius: 7, color: COLORS.textMid, cursor: 'pointer', padding: '5px 8px', font: 'inherit', fontSize: 11.5 }}>📝 {(p.activities || []).filter(a => a.type === 'note').length || '+'}</button>
+                  </td>
+                  <td style={{ padding: '10px 12px', borderBottom: `1px solid ${COLORS.border}`, whiteSpace: 'nowrap' }}>
                     <button onClick={() => setEditing(p)} style={{ border: 0, background: 'none', color: COLORS.blue, cursor: 'pointer', font: 'inherit', fontSize: 11.5, fontWeight: 600 }}>View / Edit</button>
                     <button onClick={async () => { if (window.confirm(`Delete ${p.name}? This removes it from the shared workspace.`)) { setActionError(''); try { await onDelete(p.id); } catch (error) { setActionError(error.message || 'Delete failed.'); } } }}
                       style={{ border: 0, background: 'none', color: COLORS.red, cursor: 'pointer', font: 'inherit', fontSize: 11.5, fontWeight: 600 }}>Delete</button>
@@ -2042,6 +2054,7 @@ const Prospects = ({ prospects, onSync, syncedAt, news, onAdd, onUpdate, onDelet
       {actionError && <div role="alert" style={{ marginTop: 12, color: COLORS.red, fontSize: 12 }}>{actionError}</div>}
       {adding && <AddProspectModal onClose={() => setAdding(false)} onSave={onAdd} />}
       {editing && <AddProspectModal prospect={editing} onClose={() => setEditing(null)} onSave={onUpdate} />}
+      {notesFor && (() => { const prospect = prospects.find(p => p.id === notesFor); return prospect ? <NotesModal proposal={prospect} onUpdate={onUpdate} onClose={() => setNotesFor(null)} /> : null; })()}
     </div>
   );
 };
