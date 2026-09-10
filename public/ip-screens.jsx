@@ -1886,8 +1886,8 @@ const Signals = ({ signals, syncedAt, error, onUpdate, onSync, onDraft }) => {
   );
 };
 
-const AddProspectModal = ({ onClose, onAdd }) => {
-  const [form, setForm] = useState({ name: '', type: 'university', contact: '', email: '', researcherCount: '', federalFunding: '', primaryRisk: '' });
+const AddProspectModal = ({ prospect = null, onClose, onSave }) => {
+  const [form, setForm] = useState(() => prospect ? { ...prospect, researcherCount: prospect.researcherCount ?? '', federalFunding: prospect.federalFunding ?? '' } : { name: '', type: 'university', contact: '', email: '', researcherCount: '', federalFunding: '', primaryRisk: '' });
   const [error, setError] = useState('');
   const field = (key, label, type = 'text', required = false) => (
     <label style={{ display: 'grid', gap: 6, fontSize: 12, fontWeight: 600, color: COLORS.textMid }}>
@@ -1901,12 +1901,12 @@ const AddProspectModal = ({ onClose, onAdd }) => {
     e.preventDefault();
     const name = form.name.trim();
     if (!name) { setError('Institution name is required.'); return; }
-    onAdd({
-      id: crypto.randomUUID(), name, type: form.type,
+    onSave({
+      ...prospect, id: prospect?.id || crypto.randomUUID(), name, type: form.type,
       contact: form.contact.trim(), email: form.email.trim(),
       researcherCount: form.researcherCount === '' ? null : Math.max(0, Number(form.researcherCount) || 0),
       federalFunding: form.federalFunding === '' ? null : Math.max(0, Number(form.federalFunding) || 0),
-      primaryRisk: form.primaryRisk.trim(), createdAt: new Date().toISOString(),
+      primaryRisk: form.primaryRisk.trim(), createdAt: prospect?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(),
     });
     onClose();
   };
@@ -1916,7 +1916,7 @@ const AddProspectModal = ({ onClose, onAdd }) => {
       <form onSubmit={submit} onClick={e => e.stopPropagation()}
         style={{ width: 'min(620px, 100%)', maxHeight: '90vh', overflowY: 'auto', background: '#fff', borderRadius: 14, boxShadow: COLORS.shadowLg, padding: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 20, marginBottom: 20 }}>
-          <div><h2 style={{ margin: 0, fontSize: 19 }}>Add prospect</h2><p style={{ margin: '5px 0 0', fontSize: 12, color: COLORS.textSoft }}>Create an institution or company in the shared pipeline.</p></div>
+          <div><h2 style={{ margin: 0, fontSize: 19 }}>{prospect ? 'Prospect details' : 'Add prospect'}</h2><p style={{ margin: '5px 0 0', fontSize: 12, color: COLORS.textSoft }}>{prospect ? 'Review or update this pipeline record.' : 'Create an institution or company in the shared pipeline.'}</p></div>
           <button type="button" aria-label="Close" onClick={onClose} style={{ border: 0, background: 'none', cursor: 'pointer', fontSize: 22, color: COLORS.textSoft }}>×</button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
@@ -1939,16 +1939,17 @@ const AddProspectModal = ({ onClose, onAdd }) => {
         {error && <div role="alert" style={{ color: COLORS.red, fontSize: 12, marginTop: 12 }}>{error}</div>}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
           <Btn type="button" variant="secondary" onClick={onClose}>Cancel</Btn>
-          <Btn type="submit">Add prospect</Btn>
+          <Btn type="submit">{prospect ? 'Save changes' : 'Add prospect'}</Btn>
         </div>
       </form>
     </div>
   );
 };
 
-const Prospects = ({ prospects, onSync, syncedAt, news, onAdd }) => {
+const Prospects = ({ prospects, onSync, syncedAt, news, onAdd, onUpdate, onDelete }) => {
   const [syncing, setSyncing] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState(null);
   const radarCount = prospects.filter(p => p.radar).length;
 
   const syncNow = async () => {
@@ -1976,7 +1977,7 @@ const Prospects = ({ prospects, onSync, syncedAt, news, onAdd }) => {
       <Card>
         <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr style={{ background: COLORS.bg }}>{['Institution', 'Type', 'Primary Contact', 'Researchers', 'Federal Funding', 'Primary Risk / Signal', 'Radar'].map(dataTh)}</tr></thead>
+          <thead><tr style={{ background: COLORS.bg }}>{['Institution', 'Type', 'Primary Contact', 'Researchers', 'Federal Funding', 'Primary Risk / Signal', 'Radar', 'Actions'].map(dataTh)}</tr></thead>
           <tbody>
             {prospects.map(p => {
               const cfg = PROSPECT_TYPE_CONFIG[p.type] || {};
@@ -2020,6 +2021,11 @@ const Prospects = ({ prospects, onSync, syncedAt, news, onAdd }) => {
                       </div>
                     ) : <span style={{ color: COLORS.textGhost }}>—</span>}
                   </td>
+                  <td style={{ padding: '10px 12px', borderBottom: `1px solid ${COLORS.border}`, whiteSpace: 'nowrap' }}>
+                    <button onClick={() => setEditing(p)} style={{ border: 0, background: 'none', color: COLORS.blue, cursor: 'pointer', font: 'inherit', fontSize: 11.5, fontWeight: 600 }}>View / Edit</button>
+                    <button onClick={() => { if (window.confirm(`Delete ${p.name}? The deletion is applied when you save shared changes.`)) onDelete(p.id); }}
+                      style={{ border: 0, background: 'none', color: COLORS.red, cursor: 'pointer', font: 'inherit', fontSize: 11.5, fontWeight: 600 }}>Delete</button>
+                  </td>
                 </tr>
               );
             })}
@@ -2027,7 +2033,8 @@ const Prospects = ({ prospects, onSync, syncedAt, news, onAdd }) => {
         </table>
         </div>
       </Card>
-      {adding && <AddProspectModal onClose={() => setAdding(false)} onAdd={onAdd} />}
+      {adding && <AddProspectModal onClose={() => setAdding(false)} onSave={onAdd} />}
+      {editing && <AddProspectModal prospect={editing} onClose={() => setEditing(null)} onSave={record => { onUpdate(record); setEditing(null); }} />}
     </div>
   );
 };

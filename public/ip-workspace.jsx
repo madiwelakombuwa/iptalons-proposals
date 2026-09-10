@@ -7,7 +7,10 @@ function useSharedWorkspace({ mode, auth, proposals, prospects, setProposals, se
   const bases = useRef({ proposal: new Map(), prospect: new Map() });
   const enabled = mode === 'access';
   const entries = { proposal: proposals, prospect: prospects };
-  const dirty = enabled && ready && Object.entries(entries).some(([kind, rows]) => rows.some(row => bases.current[kind].get(row.id)?.json !== JSON.stringify(row)));
+  const dirty = enabled && ready && Object.entries(entries).some(([kind, rows]) => {
+    const ids = new Set(rows.map(row => row.id));
+    return rows.some(row => bases.current[kind].get(row.id)?.json !== JSON.stringify(row)) || [...bases.current[kind].keys()].some(id => !ids.has(id));
+  });
   const request = async (path, body) => {
     const response = await fetch(path, body === undefined ? { cache: 'no-store' } : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     let result; try { result = await response.json(); } catch { throw new Error('Sign-in expired or the server is unavailable. Export your edits before reloading.'); }
@@ -50,6 +53,15 @@ function useSharedWorkspace({ mode, auth, proposals, prospects, setProposals, se
         if (before?.json === JSON.stringify(record)) continue;
         const result = await request(`/api/workspace/records/${kind}/${encodeURIComponent(record.id)}`, { record, expectedRevision: before?.revision || 0 });
         bases.current[kind].set(record.id, { revision: result.revision, json: JSON.stringify(record) }); saved++;
+      }
+      for (const [kind, rows] of Object.entries(entries)) {
+        const ids = new Set(rows.map(record => record.id));
+        for (const [id, before] of [...bases.current[kind].entries()]) if (!ids.has(id)) {
+          const response = await fetch(`/api/workspace/records/${kind}/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedRevision: before.revision }) });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.error || `Delete failed (${response.status})`);
+          bases.current[kind].delete(id); saved++;
+        }
       }
       setMessage(`Saved ${saved} changed records to the workspace.`);
     } catch (e) { setMessage(`${saved} records saved. ${e.message} Your remaining edits are still in this tab; use Export edits.`); }

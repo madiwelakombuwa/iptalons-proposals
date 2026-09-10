@@ -19,7 +19,7 @@ function database() {
   return { sql, db };
 }
 const admin = { email: 'admin@example.invalid', subject: 'admin-id', role: 'admin' as const };
-const request = (id = '', body?: unknown, kind = 'proposal') => new Request('https://test.example/api/workspace/records/'+kind+(id ? '/'+id : ''), { method: body === undefined ? 'GET' : 'POST', ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+const request = (id = '', body?: unknown, kind = 'proposal', method?: string) => new Request('https://test.example/api/workspace/records/'+kind+(id ? '/'+id : ''), { method: method || (body === undefined ? 'GET' : 'POST'), ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 
 test('shared records preserve data, reject stale edits, retain versions, and import idempotently', async () => {
   const { sql, db } = database();
@@ -32,6 +32,10 @@ test('shared records preserve data, reject stale edits, retain versions, and imp
   r = await workspace(request(record.id, { record: { ...record, name: 'Different client' }, expectedRevision: 0, import: true }), db, admin); assert.equal(r.status, 409);
   const write = (name: string) => workspace(request(record.id, { record: { ...record, name }, expectedRevision: 1 }), db, admin);
   const results = await Promise.all([write('A'), write('B')]); assert.deepEqual(results.map(r=>r.status).sort(), [200,409]);
+  assert.equal((sql.prepare('SELECT COUNT(*) AS n FROM workspace_record_versions').get() as any).n, 2);
+  assert.equal((await workspace(request(record.id, { expectedRevision: 1 }, 'proposal', 'DELETE'), db, admin)).status, 409);
+  assert.equal((await workspace(request(record.id, { expectedRevision: 2 }, 'proposal', 'DELETE'), db, admin)).status, 200);
+  assert.equal((sql.prepare('SELECT COUNT(*) AS n FROM workspace_records').get() as any).n, 0);
   assert.equal((sql.prepare('SELECT COUNT(*) AS n FROM workspace_record_versions').get() as any).n, 2);
   assert.equal((await workspace(request('other', { record, expectedRevision: 0 }), db, admin)).status, 400);
   assert.equal((await workspace(request(record.id, { record, expectedRevision: 0, import: true }), db, { ...admin, role: 'member' })).status, 403);

@@ -84,5 +84,16 @@ export async function workspace(request: Request, db: D1Database | undefined, id
     if (body.import && current?.record_json === data) return json({ ...present(current), alreadyImported: true });
     return json({ error: 'This record has changed or its ID already exists. Export your edits before reloading; nothing was overwritten.', conflict: true, currentRevision: current?.revision ?? null }, 409);
   }
+  if (request.method === 'DELETE' && id) {
+    let body;
+    try { body = await request.json() as { expectedRevision?: number }; } catch { return json({ error: 'Invalid JSON' }, 400); }
+    if (!Number.isSafeInteger(body?.expectedRevision) || body.expectedRevision! < 1)
+      return json({ error: 'A positive expectedRevision is required' }, 400);
+    const deleted = await db.prepare('DELETE FROM workspace_records WHERE kind = ? AND id = ? AND revision = ? RETURNING id')
+      .bind(kind, id, body.expectedRevision).first<{ id: string }>();
+    if (deleted) return json({ deleted: true, id });
+    const current = await db.prepare('SELECT revision FROM workspace_records WHERE kind = ? AND id = ?').bind(kind,id).first<{ revision: number }>();
+    return json({ error: 'This record has changed or was already deleted. Reload before trying again; nothing was overwritten.', conflict: true, currentRevision: current?.revision ?? null }, 409);
+  }
   return json({ error: 'Method not allowed' }, 405);
 }

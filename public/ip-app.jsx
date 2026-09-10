@@ -706,7 +706,10 @@ const App = () => {
                   startNew(p);
                 }} />
             )}
-              {screen === 'prospects' && <Prospects prospects={prospects} onSync={loadSignals} syncedAt={signalsSyncedAt} news={displayNews} onAdd={prospect => setProspects(prev => [prospect, ...prev])} />}
+              {screen === 'prospects' && <Prospects prospects={prospects} onSync={loadSignals} syncedAt={signalsSyncedAt} news={displayNews}
+                onAdd={prospect => setProspects(prev => [prospect, ...prev])}
+                onUpdate={prospect => setProspects(prev => prev.map(row => row.id === prospect.id ? prospect : row))}
+                onDelete={id => setProspects(prev => prev.filter(row => row.id !== id))} />}
             {screen === 'services'  && <ServicesScreen />}
             {screen === 'templates' && <Templates />}
             {screen === 'reports'   && <Analytics proposals={proposals} />}
